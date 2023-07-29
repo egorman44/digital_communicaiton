@@ -1,15 +1,18 @@
 import math
 
 class PolyDivision:
-    def __init__(self, init_message, poly, poly_degree, dbg = 0):
-        self.init_message = init_message
-        self.poly_degree  = poly_degree
-        self.enc_message  = init_message *(2**self.poly_degree)
-        self.poly         = poly + (2**self.poly_degree)
-        self.iteration    = 0
-        self.dbg          = dbg
+    def __init__(self, message, message_degree, poly, poly_degree, init = 0, res_xor = 0, dbg = 1):
+        self.message        = message
+        self.message_degree = message_degree
+        self.poly_degree    = poly_degree
+        self.enc_message    = message *(2**self.poly_degree)
+        self.enc_message    = init * (2**(self.message_degree)) ^ self.enc_message
+        self.poly           = poly + (2**self.poly_degree)
+        self.iteration      = 0
+        self.dbg            = dbg
         print("POLY    : {}".format(hex(self.poly)))
         print("MESSAGE : {}".format(hex(self.enc_message)))
+        print(f"DBG : {self.dbg}")
         self.divide(self.enc_message, self.dbg)
         
     def divide(self, divident, dbg):
@@ -18,7 +21,7 @@ class PolyDivision:
             divident_degree = int(math.floor(math.log2(divident)))
         else:
             divident_degree = 0
-        if(divident_degree >= self.poly_degree):            
+        if(divident_degree >= self.poly_degree):
             diff_degree     = divident_degree - self.poly_degree
             poly_Xn         = self.poly * (2**diff_degree)
             xor             = divident ^ poly_Xn
@@ -40,12 +43,10 @@ class PolyDivision:
             print("CRC: "+ hex(divident))
             
 
-poly = 0x1021
-message = 0x313233343536373839
-#message = 0x0
+poly        = 0x4C11DB7
+poly_degree = 32
+message     = 0xBB
+message_degree = 8                                      
+init        = 0x135B56FA
 
-PolyDiv = PolyDivision(message, poly, 16)
-#PolyDiv.divide(1)
-
-#xor0 = polyDivision(message, poly)
-#xor1 = polyDivision(xor0, poly)
+PolyDiv = PolyDivision(message, message_degree, poly, poly_degree, init,0, 1)
