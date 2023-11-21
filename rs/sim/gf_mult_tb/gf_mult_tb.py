@@ -20,14 +20,31 @@ from rs import gf_mult_noLUT
 from rs import init_tables
 
 # Parameters
-SYMB_WIDTH = 8
-POLY = 285
+SYMB_WIDTH = 4
+
+if(SYMB_WIDTH == 8):
+    POLY = 285
+elif(SYMB_WIDTH == 7):
+    POLY = 137
+elif(SYMB_WIDTH == 6):
+    POLY = 67
+elif(SYMB_WIDTH == 5):
+    POLY = 37
+elif(SYMB_WIDTH == 4):
+    POLY = 19
+elif(SYMB_WIDTH == 3):
+    POLY = 11
+elif(SYMB_WIDTH == 2):
+    POLY = 7
+
+    
+
 
 @cocotb.test()
 async def gf_mult_test(dut):
-    poly = 285
+    
     await Timer(2, units="ns")    
-    init_tables()
+    init_tables(POLY,2,SYMB_WIDTH)
     
     for i in range(200):
         A = random.randint(0, 2**SYMB_WIDTH-1)
