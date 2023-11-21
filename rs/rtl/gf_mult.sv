@@ -10,8 +10,7 @@ module gf_mult
     );
 
    localparam SYMB_NUM		= 2 ** SYMB_WIDTH;   
-   localparam POLY_WIDTH	= 9;
-   				  
+   
    logic [SYMB_WIDTH-1:0] symb_to_alpha[1:0][SYMB_NUM-1:0];
    logic [SYMB_WIDTH-1:0] alpha_to_symb[SYMB_NUM-1:0];
    
