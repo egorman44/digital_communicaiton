@@ -23,20 +23,17 @@ def bit_length(n):
         while n >> bits: bits += 1
         return bits
 
-def gf_mult_noLUT(x, y, prim=0):
-    '''Multiplication in Galois Fields without using a precomputed look-up table (and thus it's slower)
-    by using the standard carry-less multiplication + modular reduction using an irreducible prime polynomial'''
+def gf_mult_noLUT(x, y, prim=0, field_charac_full=256, carryless=True):
+    '''Galois Field integer multiplication using Russian Peasant Multiplication algorithm (faster than the standard multiplication + modular reduction).
+    If prim is 0 and carryless=False, then the function produces the result for a standard integers multiplication (no carry-less arithmetics nor modular reduction).'''
+    r = 0
+    while y: # while y is above 0
+        if y & 1: r = r ^ x if carryless else r + x # y is odd, then add the corresponding x to r (the sum of all x's corresponding to odd y's will give the final product). Note that since we're in GF(2), the addition is in fact an XOR (very important because in GF(2) the multiplication and additions are carry-less, thus it changes the result!).
+        y = y >> 1 # equivalent to y // 2
+        x = x << 1 # equivalent to x*2
+        if prim > 0 and x & field_charac_full: x = x ^ prim # GF modulo: if x >= 256 then apply modular reduction using the primitive polynomial (we just substract, but since the primitive number can be above 256 then we directly XOR).
 
-    ### Define bitwise carry-less operations as inner functions ###
-    def cl_mult(x,y):
-        '''Bitwise carry-less multiplication on integers'''
-        z = 0
-        i = 0
-        while (y>>i) > 0:
-            if y & (1<<i):
-                z ^= x<<i
-            i += 1
-        return z
+    return r
 
     def bit_length(n):
         '''Compute the position of the most significant bit (1) of an integer. Equivalent to int.bit_length()'''
@@ -73,35 +70,56 @@ def gf_mult_noLUT(x, y, prim=0):
 gf_exp = [0] * 512 # Create list of 512 elements. In Python 2.6+, consider using bytearray
 gf_log = [0] * 256
 
-def init_tables(prim=0x11d):
-    '''Precompute the logarithm and anti-log tables for faster computation later, using the provided primitive polynomial.'''
-    # prim is the primitive (binary) polynomial. Since it's a polynomial in the binary sense,
-    # it's only in fact a single galois field value between 0 and 255, and not a list of gf values.
-    global gf_exp, gf_log
-    gf_exp = [0] * 512 # anti-log (exponential) table
-    gf_log = [0] * 256 # log table
+def init_tables(prim=0x11d, generator=2, c_exp=8):
+    '''Precompute the logarithm and anti-log tables for faster computation later, using the provided primitive polynomial.
+    These tables are used for multiplication/division since addition/substraction are simple XOR operations inside GF of characteristic 2.
+    The basic idea is quite simple: since b**(log_b(x), log_b(y)) == x * y given any number b (the base or generator of the logarithm), then we can use any number b to precompute logarithm and anti-log (exponentiation) tables to use for multiplying two numbers x and y.
+    That's why when we use a different base/generator number, the log and anti-log tables are drastically different, but the resulting computations are the same given any such tables.
+    For more infos, see https://en.wikipedia.org/wiki/Finite_field_arithmetic#Implementation_tricks
+    '''
+    # generator is the generator number (the "increment" that will be used to walk through the field by multiplication, this must be a prime number). This is basically the base of the logarithm/anti-log tables. Also often noted "alpha" in academic books.
+    # prim is the primitive/prime (binary) polynomial and must be irreducible (ie, it can't represented as the product of two smaller polynomials). It's a polynomial in the binary sense: each bit is a coefficient, but in fact it's an integer between field_charac+1 and field_charac*2, and not a list of gf values. The prime polynomial will be used to reduce the overflows back into the range of the Galois Field without duplicating values (all values should be unique). See the function find_prime_polys() and: http://research.swtch.com/field and http://www.pclviewer.com/rs2/galois.html
+    # note that the choice of generator or prime polynomial doesn't matter very much: any two finite fields of size p^n have identical structure, even if they give the individual elements different names (ie, the coefficients of the codeword will be different, but the final result will be the same: you can always correct as many errors/erasures with any choice for those parameters). That's why it makes sense to refer to all the finite fields, and all decoders based on Reed-Solomon, of size p^n as one concept: GF(p^n). It can however impact sensibly the speed (because some parameters will generate sparser tables).
+    # c_exp is the exponent for the field's characteristic GF(2^c_exp)
+
+    global gf_exp, gf_log, field_charac
+    field_charac = int(2**c_exp - 1)
+    gf_exp = [0] * (field_charac * 2) # anti-log (exponential) table. The first two elements will always be [GF256int(1), generator]
+    gf_log = [0] * (field_charac+1) # log table, log[0] is impossible and thus unused
+
     # For each possible value in the galois field 2^8, we will pre-compute the logarithm and anti-logarithm (exponential) of this value
+    # To do that, we generate the Galois Field F(2^p) by building a list starting with the element 0 followed by the (p-1) successive powers of the generator a : 1, a, a^1, a^2, ..., a^(p-1).
     x = 1
-    for i in range(0, 255):
+    for i in range(field_charac): # we could skip index 255 which is equal to index 0 because of modulo: g^255==g^0 but either way, this does not change the later outputs (ie, the ecc symbols will be the same either way)
         gf_exp[i] = x # compute anti-log for this value and store it in a table
         gf_log[x] = i # compute log at the same time
-        x = gf_mult_noLUT(x, 2, prim)
+        x = gf_mult_noLUT(x, generator, prim, field_charac+1)
 
         # If you use only generator==2 or a power of 2, you can use the following which is faster than gf_mult_noLUT():
         #x <<= 1 # multiply by 2 (change 1 by another number y to multiply by a power of 2^y)
         #if x & 0x100: # similar to x >= 256, but a lot faster (because 0x100 == 256)
             #x ^= prim # substract the primary polynomial to the current value (instead of 255, so that we get a unique set made of coprime numbers), this is the core of the tables generation
 
-    # Optimization: double the size of the anti-log table so that we don't need to mod 255 to
-    # stay inside the bounds (because we will mainly use this table for the multiplication of two GF numbers, no more).
-    for i in range(255, 512):
-        gf_exp[i] = gf_exp[i - 255]
+    # Optimization: double the size of the anti-log table so that we don't need to mod 255 to stay inside the bounds (because we will mainly use this table for the multiplication of two GF numbers, no more).
+    for i in range(field_charac, field_charac * 2):
+        gf_exp[i] = gf_exp[i - field_charac]
+
+    for indx in range(len(gf_log)):
+            print(f"gf_log[{indx}] = 0x{gf_log[indx]:x}")
+    for indx in range(len(gf_exp)):
+            print(f"gf_exp[{indx}] = 0x{gf_exp[indx]:x}")
+
     return [gf_log, gf_exp]
 
 
 def gf_mul(x,y):
     if x==0 or y==0:
         return 0
+    print("")
+    print(f"gf_log[x] = {gf_log[x]:x}")
+    print(f"gf_log[y] = {gf_log[y]:x}")
+    print(f"gf_log[x] + gf_log[y] = {gf_log[x] + gf_log[y]:x}")
+    print(f"gf_log[x] + gf_log[y] = {(gf_log[x] + gf_log[y])%255:x}")
     return gf_exp[gf_log[x] + gf_log[y]] # should be gf_exp[(gf_log[x]+gf_log[y])%255] if gf_exp wasn't oversized
 
 def gf_div(x,y):
