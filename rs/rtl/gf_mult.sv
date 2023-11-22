@@ -14,7 +14,7 @@ module gf_mult
    always_comb begin
       alpha_to_symb_tbl = alpha_to_symb();
       for(int tbl_indx = 0; tbl_indx < 2; ++tbl_indx)
-	symb_to_alpha_tbl[tbl_indx] = symb_to_alpha(alpha_to_symb_tbl);
+	symb_to_alpha_tbl[tbl_indx] = symb_to_alpha();
    end
    
    // 1. Convert symbols to alpha:   

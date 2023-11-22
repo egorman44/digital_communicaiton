@@ -35,10 +35,12 @@ package gf_pkg;
    // Note. There is no alpha_to_symb[x] = 0, thus make it manually
    //////////////////////////////////////
    
-   function alpha_to_symb_t symb_to_alpha (alpha_to_symb_t alpha_to_symb);
+   function alpha_to_symb_t symb_to_alpha ();
+      alpha_to_symb_t alpha_to_symb_tbl;
+      alpha_to_symb_tbl = alpha_to_symb();
       symb_to_alpha[0] = 0;	 
       for(int i = 0; i < SYMB_NUM; ++i) begin
-	 symb_to_alpha[alpha_to_symb[i]] = i[SYMB_WIDTH-1:0];
+	 symb_to_alpha[alpha_to_symb_tbl[i]] = i[SYMB_WIDTH-1:0];
       end
    endfunction // symb_to_alpha
    
