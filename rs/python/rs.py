@@ -1,74 +1,93 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 # All code is taken from here:
 # https://en.wikiversity.org/wiki/Reed%E2%80%93Solomon_codes_for_coders/Additional_information#Universal_Reed-Solomon_Codec
 
-def cl_div(dividend, divisor=None):
-        '''Bitwise carry-less long division on integers and returns the remainder'''
-        # Compute the position of the most significant bit for each integers
-        dl1 = bit_length(dividend)
-        dl2 = bit_length(divisor)
-        # If the dividend is smaller than the divisor, just exit
-        if dl1 < dl2:
-            return dividend
-        # Else, align the most significant 1 of the divisor to the most significant 1 of the dividend (by shifting the divisor)
-        for i in range(dl1-dl2,-1,-1):
-            # Check that the dividend is divisible (useless for the first iteration but important for the next ones)
-            if dividend & (1 << i+dl2-1):
-                # If divisible, then shift the divisor to align the most significant bits and XOR (carry-less subtraction)
-                dividend ^= divisor << i
-        return dividend
+###################################################
+### Universal Reed-Solomon Codec
+### initially released at Wikiversity
+###################################################
 
-def bit_length(n):
-        '''Compute the position of the most significant bit (1) of an integer. Equivalent to int.bit_length()'''
-        bits = 0
-        while n >> bits: bits += 1
-        return bits
+################### INIT and stuff ###################
 
-def gf_mult_noLUT(x, y, prim=0, field_charac_full=256, carryless=True):
-    '''Galois Field integer multiplication using Russian Peasant Multiplication algorithm (faster than the standard multiplication + modular reduction).
-    If prim is 0 and carryless=False, then the function produces the result for a standard integers multiplication (no carry-less arithmetics nor modular reduction).'''
-    r = 0
-    while y: # while y is above 0
-        if y & 1: r = r ^ x if carryless else r + x # y is odd, then add the corresponding x to r (the sum of all x's corresponding to odd y's will give the final product). Note that since we're in GF(2), the addition is in fact an XOR (very important because in GF(2) the multiplication and additions are carry-less, thus it changes the result!).
-        y = y >> 1 # equivalent to y // 2
-        x = x << 1 # equivalent to x*2
-        if prim > 0 and x & field_charac_full: x = x ^ prim # GF modulo: if x >= 256 then apply modular reduction using the primitive polynomial (we just substract, but since the primitive number can be above 256 then we directly XOR).
+try: # compatibility with Python 3+
+    xrange
+except NameError:
+    xrange = range
 
-    return r
+class ReedSolomonError(Exception):
+    pass
 
-    def bit_length(n):
-        '''Compute the position of the most significant bit (1) of an integer. Equivalent to int.bit_length()'''
-        bits = 0
-        while n >> bits: bits += 1
-        return bits
-
-    def cl_div(dividend, divisor=None):
-        '''Bitwise carry-less long division on integers and returns the remainder'''
-        # Compute the position of the most significant bit for each integers
-        dl1 = bit_length(dividend)
-        dl2 = bit_length(divisor)
-        # If the dividend is smaller than the divisor, just exit
-        if dl1 < dl2:
-            return dividend
-        # Else, align the most significant 1 of the divisor to the most significant 1 of the dividend (by shifting the divisor)
-        for i in range(dl1-dl2,-1,-1):
-            # Check that the dividend is divisible (useless for the first iteration but important for the next ones)
-            if dividend & (1 << i+dl2-1):
-                # If divisible, then shift the divisor to align the most significant bits and XOR (carry-less subtraction)
-                dividend ^= divisor << i
-        return dividend
-    
-    ### Main GF multiplication routine ###
-    
-    # Multiply the gf numbers
-    result = cl_mult(x,y)
-    # Then do a modular reduction (ie, remainder from the division) with an irreducible primitive polynomial so that it stays inside GF bounds
-    if prim > 0:
-        result = cl_div(result, prim)
-
-    return result
-
-gf_exp = [0] * 512 # Create list of 512 elements. In Python 2.6+, consider using bytearray
+gf_exp = [0] * 512 # For efficiency, gf_exp[] has size 2*GF_SIZE, so that a simple multiplication of two numbers can be resolved without calling % 255. For more infos on how to generate this extended exponentiation table, see paper: "Fast software implementation of finite field operations", Cheng Huang and Lihao Xu, Washington University in St. Louis, Tech. Rep (2003).
 gf_log = [0] * 256
+field_charac = int(2**8 - 1)
+
+################### GALOIS FIELD ELEMENTS MATHS ###################
+
+def rwh_primes1(n):
+    # http://stackoverflow.com/questions/2068372/fastest-way-to-list-all-primes-below-n-in-python/3035188#3035188
+    ''' Returns  a list of primes < n '''
+    sieve = [True] * (n/2)
+    for i in xrange(3,int(n**0.5)+1,2):
+        if sieve[i/2]:
+            sieve[i*i/2::i] = [False] * ((n-i*i-1)/(2*i)+1)
+    return [2] + [2*i+1 for i in xrange(1,n/2) if sieve[i]]
+
+def find_prime_polys(generator=2, c_exp=8, fast_primes=False, single=False):
+    '''Compute the list of prime polynomials for the given generator and galois field characteristic exponent.'''
+    # fast_primes will output less results but will be significantly faster.
+    # single will output the first prime polynomial found, so if all you want is to just find one prime polynomial to generate the LUT for Reed-Solomon to work, then just use that.
+
+    # A prime polynomial (necessarily irreducible) is necessary to reduce the multiplications in the Galois Field, so as to avoid overflows.
+    # Why do we need a "prime polynomial"? Can't we just reduce modulo 255 (for GF(2^8) for example)? Because we need the values to be unique.
+    # For example: if the generator (alpha) = 2 and c_exp = 8 (GF(2^8) == GF(256)), then the generated Galois Field (0, 1, a, a^1, a^2, ..., a^(p-1)) will be galois field it becomes 0, 1, 2, 4, 8, 16, etc. However, upon reaching 128, the next value will be doubled (ie, next power of 2), which will give 256. Then we must reduce, because we have overflowed above the maximum value of 255. But, if we modulo 255, this will generate 256 == 1. Then 2, 4, 8, 16, etc. giving us a repeating pattern of numbers. This is very bad, as it's then not anymore a bijection (ie, a non-zero value doesn't have a unique index). That's why we can't just modulo 255, but we need another number above 255, which is called the prime polynomial.
+    # Why so much hassle? Because we are using precomputed look-up tables for multiplication: instead of multiplying a*b, we precompute alpha^a, alpha^b and alpha^(a+b), so that we can just use our lookup table at alpha^(a+b) and get our result. But just like in our original field we had 0,1,2,...,p-1 distinct unique values, in our "LUT" field using alpha we must have unique distinct values (we don't care that they are different from the original field as long as they are unique and distinct). That's why we need to avoid duplicated values, and to avoid duplicated values we need to use a prime irreducible polynomial.
+
+    # Here is implemented a bruteforce approach to find all these prime polynomials, by generating every possible prime polynomials (ie, every integers between field_charac+1 and field_charac*2), and then we build the whole Galois Field, and we reject the candidate prime polynomial if it duplicates even one value or if it generates a value above field_charac (ie, cause an overflow).
+    # Note that this algorithm is slow if the field is too big (above 12), because it's an exhaustive search algorithm. There are probabilistic approaches, and almost surely prime approaches, but there is no determistic polynomial time algorithm to find irreducible monic polynomials. More info can be found at: http://people.mpi-inf.mpg.de/~csaha/lectures/lec9.pdf
+    # Another faster algorithm may be found at Adleman, Leonard M., and Hendrik W. Lenstra. "Finding irreducible polynomials over finite fields." Proceedings of the eighteenth annual ACM symposium on Theory of computing. ACM, 1986.
+
+# Prepare the finite field characteristic (2^p - 1), this also represent the maximum possible value in this field
+    root_charac = 2 # we're in GF(2)
+    field_charac = int(root_charac**c_exp - 1)
+    field_charac_next = int(root_charac**(c_exp+1) - 1)
+
+    prim_candidates = []
+    if fast_primes:
+        prim_candidates = rwh_primes1(field_charac_next) # generate maybe prime polynomials and check later if they really are irreducible
+        prim_candidates = [x for x in prim_candidates if x > field_charac] # filter out too small primes
+    else:
+        prim_candidates = xrange(field_charac+2, field_charac_next, root_charac) # try each possible prime polynomial, but skip even numbers (because divisible by 2 so necessarily not irreducible)
+
+    # Start of the main loop
+    correct_primes = []
+    for prim in prim_candidates: # try potential candidates primitive irreducible polys
+        seen = [0] * (field_charac+1) # memory variable to indicate if a value was already generated in the field (value at index x is set to 1) or not (set to 0 by default)
+        conflict = False # flag to know if there was at least one conflict
+
+        # Second loop, build the whole Galois Field
+        x = 1
+        for i in xrange(field_charac):
+            # Compute the next value in the field (ie, the next power of alpha/generator)
+            x = gf_mult_noLUT(x, generator, prim, field_charac+1)
+
+            # Rejection criterion: if the value overflowed (above field_charac) or is a duplicate of a previously generated power of alpha, then we reject this polynomial (not prime)
+            if x > field_charac or seen[x] == 1:
+                conflict = True
+                break
+            # Else we flag this value as seen (to maybe detect future duplicates), and we continue onto the next power of alpha
+            else:
+                seen[x] = 1
+
+
+        # End of the second loop: if there's no conflict (no overflow nor duplicated value), this is a prime polynomial!
+        if not conflict: 
+            correct_primes.append(prim)
+            if single: return prim
+
+    # Return the list of all prime polynomials
+    return correct_primes # you can use the following to print the hexadecimal representation of each prime polynomial: print [hex(i) for i in correct_primes]
 
 def init_tables(prim=0x11d, generator=2, c_exp=8):
     '''Precompute the logarithm and anti-log tables for faster computation later, using the provided primitive polynomial.
@@ -87,10 +106,10 @@ def init_tables(prim=0x11d, generator=2, c_exp=8):
     gf_exp = [0] * (field_charac * 2) # anti-log (exponential) table. The first two elements will always be [GF256int(1), generator]
     gf_log = [0] * (field_charac+1) # log table, log[0] is impossible and thus unused
 
-    # For each possible value in the galois field 2^8, we will pre-compute the logarithm and anti-logarithm (exponential) of this value
+# For each possible value in the galois field 2^8, we will pre-compute the logarithm and anti-logarithm (exponential) of this value
     # To do that, we generate the Galois Field F(2^p) by building a list starting with the element 0 followed by the (p-1) successive powers of the generator a : 1, a, a^1, a^2, ..., a^(p-1).
     x = 1
-    for i in range(field_charac): # we could skip index 255 which is equal to index 0 because of modulo: g^255==g^0 but either way, this does not change the later outputs (ie, the ecc symbols will be the same either way)
+    for i in xrange(field_charac): # we could skip index 255 which is equal to index 0 because of modulo: g^255==g^0 but either way, this does not change the later outputs (ie, the ecc symbols will be the same either way)
         gf_exp[i] = x # compute anti-log for this value and store it in a table
         gf_log[x] = i # compute log at the same time
         x = gf_mult_noLUT(x, generator, prim, field_charac+1)
@@ -101,72 +120,89 @@ def init_tables(prim=0x11d, generator=2, c_exp=8):
             #x ^= prim # substract the primary polynomial to the current value (instead of 255, so that we get a unique set made of coprime numbers), this is the core of the tables generation
 
     # Optimization: double the size of the anti-log table so that we don't need to mod 255 to stay inside the bounds (because we will mainly use this table for the multiplication of two GF numbers, no more).
-    for i in range(field_charac, field_charac * 2):
+    for i in xrange(field_charac, field_charac * 2):
         gf_exp[i] = gf_exp[i - field_charac]
-
-    for indx in range(len(gf_log)):
-            print(f"gf_log[{indx}] = 0x{gf_log[indx]:x}")
-    for indx in range(len(gf_exp)):
-            print(f"gf_exp[{indx}] = 0x{gf_exp[indx]:x}")
 
     return [gf_log, gf_exp]
 
+def gf_sub(x, y):
+    return x ^ y # in binary galois field, substraction is just the same as addition (since we mod 2)
 
-def gf_mul(x,y):
-    if x==0 or y==0:
+def gf_neg(x):
+    return x
+
+def gf_mul(x, y):
+    if x == 0 or y == 0:
         return 0
-    print("")
-    print(f"gf_log[x] = {gf_log[x]:x}")
-    print(f"gf_log[y] = {gf_log[y]:x}")
-    print(f"gf_log[x] + gf_log[y] = {gf_log[x] + gf_log[y]:x}")
-    print(f"gf_log[x] + gf_log[y] = {(gf_log[x] + gf_log[y])%255:x}")
-    return gf_exp[gf_log[x] + gf_log[y]] # should be gf_exp[(gf_log[x]+gf_log[y])%255] if gf_exp wasn't oversized
+    return gf_exp[(gf_log[x] + gf_log[y]) % field_charac]
 
-def gf_div(x,y):
-    if y==0:
+def gf_div(x, y):
+    if y == 0:
         raise ZeroDivisionError()
-    if x==0:
+    if x == 0:
         return 0
-    return gf_exp[(gf_log[x] + 255 - gf_log[y]) % 255]
+    return gf_exp[(gf_log[x] + field_charac - gf_log[y]) % field_charac]
 
 def gf_pow(x, power):
-    return gf_exp[(gf_log[x] * power) % 255]
+    return gf_exp[(gf_log[x] * power) % field_charac]
 
 def gf_inverse(x):
-    return gf_exp[255 - gf_log[x]] # gf_inverse(x) == gf_div(1, x)
+    return gf_exp[field_charac - gf_log[x]] # gf_inverse(x) == gf_div(1, x)
 
-def gf_poly_scale(p,x):
-    r = [0] * len(p)
-    for i in range(0, len(p)):
-        r[i] = gf_mul(p[i], x)
+def gf_mult_noLUT(x, y, prim=0, field_charac_full=256, carryless=True):
+    '''Galois Field integer multiplication using Russian Peasant Multiplication algorithm (faster than the standard multiplication + modular reduction).
+    If prim is 0 and carryless=False, then the function produces the result for a standard integers multiplication (no carry-less arithmetics nor modular reduction).'''
+    r = 0
+    while y: # while y is above 0
+        if y & 1: r = r ^ x if carryless else r + x # y is odd, then add the corresponding x to r (the sum of all x's corresponding to odd y's will give the final product). Note that since we're in GF(2), the addition is in fact an XOR (very important because in GF(2) the multiplication and additions are carry-less, thus it changes the result!).
+        y = y >> 1 # equivalent to y // 2
+        x = x << 1 # equivalent to x*2
+        if prim > 0 and x & field_charac_full: x = x ^ prim # GF modulo: if x >= 256 then apply modular reduction using the primitive polynomial (we just substract, but since the primitive number can be above 256 then we directly XOR).
+
     return r
+
+################### GALOIS FIELD POLYNOMIALS MATHS ###################
+
+def gf_poly_scale(p, x):
+    return [gf_mul(p[i], x) for i in xrange(len(p))]
 
 def gf_poly_add(p,q):
     r = [0] * max(len(p),len(q))
-    for i in range(0,len(p)):
+    for i in xrange(len(p)):
         r[i+len(r)-len(p)] = p[i]
-    for i in range(0,len(q)):
+    for i in xrange(len(q)):
         r[i+len(r)-len(q)] ^= q[i]
     return r
 
-def gf_poly_mul(p,q):
-    '''Multiply two polynomials, inside Galois Field'''
+def gf_poly_mul(p, q):
+    '''Multiply two polynomials, inside Galois Field (but the procedure is generic). Optimized function by precomputation of log.'''
     # Pre-allocate the result array
-    r = [0] * (len(p)+len(q)-1)
-    # Compute the polynomial multiplication (just like the outer product of two vectors,
-    # we multiply each coefficients of p with all coefficients of q)
-    for j in range(0, len(q)):
-        for i in range(0, len(p)):
-            r[i+j] ^= gf_mul(p[i], q[j]) # equivalent to: r[i + j] = gf_add(r[i+j], gf_mul(p[i], q[j]))
-                                                         # -- you can see it's your usual polynomial multiplication
+    r = [0] * (len(p) + len(q) - 1)
+    # Precompute the logarithm of p
+    lp = [gf_log[p[i]] for i in xrange(len(p))]
+    # Compute the polynomial multiplication (just like the outer product of two vectors, we multiply each coefficients of p with all coefficients of q)
+    for j in xrange(len(q)):
+        qj = q[j] # optimization: load the coefficient once
+        if qj != 0: # log(0) is undefined, we need to check that
+            lq = gf_log[qj] # Optimization: precache the logarithm of the current coefficient of q
+            for i in xrange(len(p)):
+                if p[i] != 0: # log(0) is undefined, need to check that...
+                    r[i + j] ^= gf_exp[lp[i] + lq] # equivalent to: r[i + j] = gf_add(r[i+j], gf_mul(p[i], q[j]))
     return r
 
-def gf_poly_eval(poly, x):
-    '''Evaluates a polynomial in GF(2^p) given the value for x. This is based on Horner's scheme for maximum efficiency.'''
-    y = poly[0]
-    for i in range(1, len(poly)):
-        y = gf_mul(y, x) ^ poly[i]
-    return y
+def gf_poly_mul_simple(p, q): # simple equivalent way of multiplying two polynomials without precomputation, but thus it's slower
+    '''Multiply two polynomials, inside Galois Field'''
+    # Pre-allocate the result array
+    r = [0] * (len(p) + len(q) - 1)
+    # Compute the polynomial multiplication (just like the outer product of two vectors, we multiply each coefficients of p with all coefficients of q)
+    for j in xrange(len(q)):
+        for i in xrange(len(p)):
+            r[i + j] ^= gf_mul(p[i], q[j]) # equivalent to: r[i + j] = gf_add(r[i+j], gf_mul(p[i], q[j])) -- you can see it's your usual polynomial multiplication
+    return r
+
+def gf_poly_neg(poly):
+    '''Returns the polynomial with all coefficients negated. In GF(2^p), negation does not change the coefficient, so we return the polynomial as-is.'''
+    return poly
 
 def gf_poly_div(dividend, divisor):
     '''Fast polynomial division by using Extended Synthetic Division and optimized for GF(2^p) computations
@@ -175,14 +211,14 @@ def gf_poly_div(dividend, divisor):
     # the terms must go from the biggest to lowest degree (while most other functions here expect
     # a list from lowest to biggest degree). eg: 1 + 2x + 5x^2 = [5, 2, 1], NOT [1, 2, 5]
 
-    msg_out = list(dividend) # Copy the dividend
+    msg_out = list(dividend) # Copy the dividend list and pad with 0 where the ecc bytes will be computed
     #normalizer = divisor[0] # precomputing for performance
-    for i in range(0, len(dividend) - (len(divisor)-1)):
+    for i in xrange(len(dividend) - (len(divisor)-1)):
         #msg_out[i] /= normalizer # for general polynomial division (when polynomials are non-monic), the usual way of using
                                   # synthetic division is to divide the divisor g(x) with its leading coefficient, but not needed here.
         coef = msg_out[i] # precaching
         if coef != 0: # log(0) is undefined, so we need to avoid that case explicitly (and it's also a good optimization).
-            for j in range(1, len(divisor)): # in synthetic division, we always skip the first coefficient of the divisior,
+            for j in xrange(1, len(divisor)): # in synthetic division, we always skip the first coefficient of the divisior,
                                               # because it's only used to normalize the dividend coefficient
                 if divisor[j] != 0: # log(0) is undefined
                     msg_out[i + j] ^= gf_mul(divisor[j], coef) # equivalent to the more mathematically correct
@@ -194,34 +230,65 @@ def gf_poly_div(dividend, divisor):
     separator = -(len(divisor)-1)
     return msg_out[:separator], msg_out[separator:] # return quotient, remainder.
 
-def rs_generator_poly(nsym):
+def gf_poly_eval(poly, x):
+    '''Evaluates a polynomial in GF(2^p) given the value for x. This is based on Horner's scheme for maximum efficiency.'''
+    y = poly[0]
+    for i in xrange(1, len(poly)):
+        y = gf_mul(y, x) ^ poly[i]
+    return y
+
+################## REED-SOLOMON ENCODING ###################
+
+def rs_generator_poly(nsym, fcr=0, generator=2):
     '''Generate an irreducible generator polynomial (necessary to encode a message into Reed-Solomon)'''
     g = [1]
-    for i in range(0, nsym):
-        g = gf_poly_mul(g, [1, gf_pow(2, i)])
+    for i in xrange(nsym):
+        g = gf_poly_mul(g, [1, gf_pow(generator, i+fcr)])
     return g
 
-def rs_encode_msg(msg_in, nsym):
-    '''Reed-Solomon main encoding function, using polynomial division (algorithm Extended Synthetic Division)'''
-    if (len(msg_in) + nsym) > 255: raise ValueError("Message is too long (%i when max is 255)" % (len(msg_in)+nsym))
-    gen = rs_generator_poly(nsym)
+def rs_generator_poly_all(max_nsym, fcr=0, generator=2):
+    '''Generate all irreducible generator polynomials up to max_nsym (usually you can use n, the length of the message+ecc). Very useful to reduce processing time if you want to encode using variable schemes and nsym rates.'''
+    g_all = {}
+    g_all[0] = g_all[1] = [1]
+    for nsym in xrange(max_nsym):
+        g_all[nsym] = rs_generator_poly(nsym, fcr, generator)
+    return g_all
+
+def rs_simple_encode_msg(msg_in, nsym, fcr=0, generator=2, gen=None):
+    '''Simple Reed-Solomon encoding (mainly an example for you to understand how it works, because it's slower than the inlined function below)'''
+    global field_charac
+    if (len(msg_in) + nsym) > field_charac: raise ValueError("Message is too long (%i when max is %i)" % (len(msg_in)+nsym, field_charac))
+    if gen is None: gen = rs_generator_poly(nsym, fcr, generator)
+
+    # Pad the message, then divide it by the irreducible generator polynomial
+    _, remainder = gf_poly_div(msg_in + [0] * (len(gen)-1), gen)
+    # The remainder is our RS code! Just append it to our original message to get our full codeword (this represents a polynomial of max 256 terms)
+    msg_out = msg_in + remainder
+    # Return the codeword
+    return msg_out
+
+def rs_encode_msg(msg_in, nsym, fcr=0, generator=2, gen=None):
+    '''Reed-Solomon main encoding function, using polynomial division (Extended Synthetic Division, the fastest algorithm available to my knowledge), better explained at http://research.swtch.com/field'''
+    global field_charac
+    if (len(msg_in) + nsym) > field_charac: raise ValueError("Message is too long (%i when max is %i)" % (len(msg_in)+nsym, field_charac))
+    if gen is None: gen = rs_generator_poly(nsym, fcr, generator)
     # Init msg_out with the values inside msg_in and pad with len(gen)-1 bytes (which is the number of ecc symbols).
     msg_out = [0] * (len(msg_in) + len(gen)-1)
     # Initializing the Synthetic Division with the dividend (= input message polynomial)
     msg_out[:len(msg_in)] = msg_in
 
     # Synthetic division main loop
-    for i in range(len(msg_in)):
+    for i in xrange(len(msg_in)):
         # Note that it's msg_out here, not msg_in. Thus, we reuse the updated value at each iteration
         # (this is how Synthetic Division works: instead of storing in a temporary register the intermediate values,
         # we directly commit them to the output).
         coef = msg_out[i]
 
-        # log(0) is undefined, so we need to manually check for this case. There's no need to check
-        # the divisor here because we know it can't be 0 since we generated it.
+        # log(0) is undefined, so we need to manually check for this case.
         if coef != 0:
             # in synthetic division, we always skip the first coefficient of the divisior, because it's only used to normalize the dividend coefficient (which is here useless since the divisor, the generator polynomial, is always monic)
-            for j in range(1, len(gen)):
+            for j in xrange(1, len(gen)):
+                #if gen[j] != 0: # log(0) is undefined so we need to check that, but it slow things down in fact and it's useless in our case (reed-solomon encoding) since we know that all coefficients in the generator are not 0
                 msg_out[i+j] ^= gf_mul(gen[j], coef) # equivalent to msg_out[i+j] += gf_mul(gen[j], coef)
 
     # At this point, the Extended Synthetic Divison is done, msg_out contains the quotient in msg_out[:len(msg_in)]
@@ -230,4 +297,19 @@ def rs_encode_msg(msg_in, nsym):
     # our complete codeword composed of the message + code.
     msg_out[:len(msg_in)] = msg_in
 
-    return msg_out
+    return msg_out    
+
+################### REED-SOLOMON DECODING ###################
+
+def rs_calc_syndromes(msg, nsym, fcr=0, generator=2):
+    '''Given the received codeword msg and the number of error correcting symbols (nsym), computes the syndromes polynomial.
+    Mathematically, it's essentially equivalent to a Fourrier Transform (Chien search being the inverse).
+    '''
+    # Note the "[0] +" : we add a 0 coefficient for the lowest degree (the constant). This effectively shifts the syndrome, and will shift every computations depending on the syndromes (such as the errors locator polynomial, errors evaluator polynomial, etc. but not the errors positions).
+    # This is not necessary, you can adapt subsequent computations to start from 0 instead of skipping the first iteration (ie, the often seen range(1, n-k+1)),
+    synd = [0] * nsym
+    for i in xrange(nsym):
+        synd[i] = gf_poly_eval(msg, gf_pow(generator, i+fcr))
+    return [0] + synd # pad with one 0 for mathematical precision (else we can end up with weird calculations sometimes)
+
+
