@@ -1,8 +1,8 @@
 package gf_pkg;
 
-`ifndef SYMB_WIDTH_DEF
- `define SYMB_WIDTH_DEF 8
- `define POLY_DEF 285
+`ifndef SYMB_WIDTH
+ `define SYMB_WIDTH 8
+ `define POLY 285
 `endif
 
 `ifndef K_LEN
@@ -11,13 +11,19 @@ package gf_pkg;
 `ifndef N_LEN
  `define N_LEN 239
 `endif
+
+`ifndef BUS_WIDTH_IN_SYMB
+ `define BUS_WIDTH_IN_SYMB 4
+`endif
    
    parameter N_LEN	= `N_LEN;
    parameter K_LEN	= `K_LEN;
-   parameter SYMB_WIDTH = `SYMB_WIDTH_DEF;
-   parameter POLY	= `POLY_DEF;
-   parameter SYMB_NUM	= 2 ** SYMB_WIDTH;
-
+   parameter ROOT_NUM   = N_LEN-K_LEN;
+   parameter SYMB_WIDTH = `SYMB_WIDTH;
+   parameter POLY	= `POLY;
+   parameter SYMB_NUM	= 2 ** SYMB_WIDTH;   
+   parameter BUS_WIDTH_IN_SYMB = `BUS_WIDTH_IN_SYMB;
+   
    typedef logic [SYMB_WIDTH-1:0] alpha_to_symb_t [SYMB_NUM-1:0];
 
    typedef logic [SYMB_WIDTH-1:0] alpha_t;
@@ -77,8 +83,7 @@ package gf_pkg;
    //////////////////////////////////////
 
    function symb_t gf_mult(symb_t symb_a, symb_t symb_b);
-      alpha_t alpha_a, alpha_b, alpha_sum;
-      
+      alpha_t alpha_a, alpha_b, alpha_sum;      
       alpha_a = symb_to_alpha(symb_a);
       alpha_b = symb_to_alpha(symb_b);
       alpha_sum = (alpha_a + alpha_b) % (SYMB_NUM-1);
@@ -92,15 +97,15 @@ package gf_pkg;
    // gf_mult_power is used in syndrome calculation
    //////////////////////////////////////
 
-   function symb_t gf_mult_power(symb_t symb_a, symb_t symb_x, alpha_t power_x);
+   function symb_t gf_mult_power(symb_t symb_a, symb_t root, alpha_t power_x);
       alpha_t alpha_a, alpha_x, alpha_sum, alpha_x_power;
       
       alpha_a = symb_to_alpha(symb_a);
-      alpha_x = symb_to_alpha(symb_x);
+      alpha_x = symb_to_alpha(root);
       // TODO: check more efficient way of mult in GF
       alpha_x_power = (alpha_x * power_x) % (SYMB_NUM-1);
       alpha_sum = (alpha_a + alpha_x) % (SYMB_NUM-1);
-      if((symb_a == 0) || (symb_x == 0))
+      if((symb_a == 0) || (root == 0))
 	gf_mult_power = 0;
       else
 	gf_mult_power = alpha_to_symb(alpha_sum);
