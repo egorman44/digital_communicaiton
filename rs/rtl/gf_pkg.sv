@@ -6,10 +6,10 @@ package gf_pkg;
 `endif
 
 `ifndef K_LEN
- `define K_LEN 255
+ `define K_LEN 239
 `endif
 `ifndef N_LEN
- `define N_LEN 239
+ `define N_LEN 255
 `endif
 
 `ifndef BUS_WIDTH_IN_SYMB
@@ -18,11 +18,12 @@ package gf_pkg;
    
    parameter N_LEN	= `N_LEN;
    parameter K_LEN	= `K_LEN;
-   parameter ROOT_NUM   = N_LEN-K_LEN;
+   parameter ROOTS_NUM   = N_LEN-K_LEN;
    parameter SYMB_WIDTH = `SYMB_WIDTH;
    parameter POLY	= `POLY;
    parameter SYMB_NUM	= 2 ** SYMB_WIDTH;   
    parameter BUS_WIDTH_IN_SYMB = `BUS_WIDTH_IN_SYMB;
+   parameter FIRST_ROOT = 1;
    
    typedef logic [SYMB_WIDTH-1:0] alpha_to_symb_t [SYMB_NUM-1:0];
 
