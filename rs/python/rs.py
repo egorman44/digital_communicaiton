@@ -267,6 +267,8 @@ def rs_simple_encode_msg(msg_in, nsym, fcr=0, generator=2, gen=None):
     # Return the codeword
     return msg_out
 
+# generator = alpha^1 = 0x2(usually)
+
 def rs_encode_msg(msg_in, nsym, fcr=0, generator=2, gen=None):
     '''Reed-Solomon main encoding function, using polynomial division (Extended Synthetic Division, the fastest algorithm available to my knowledge), better explained at http://research.swtch.com/field'''
     global field_charac

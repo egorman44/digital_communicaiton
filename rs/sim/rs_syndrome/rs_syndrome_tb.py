@@ -39,6 +39,18 @@ from coco_axis.axis import AxisMonitor
 from coco_axis.axis import AxisIf
 
 from rs_lib import RsPacket
+from rs_lib import SyndrPredictor
+
+# syndrome monitor
+
+async def syndr_mon(clk, syndr_vld, syndr, aport):
+    while(True):
+        await RisingEdge(clk)
+        if(syndr_vld.value == 1):
+            syndr_int = []
+            for i in range (len(syndr.value)):
+                syndr_int.append(syndr.value[i].integer)
+            aport.append(syndr_int)
 
 # Parameters
 SYMB_WIDTH = 8
@@ -71,7 +83,6 @@ async def rs_syndrome_test(dut):
     generator = 2
     fcr = 0
     for i in range(ROOTS_NUM):
-        print(f"ROOT = {gf_pow(generator, i+fcr)}")
         dut.roots[i].value = gf_pow(generator, i+fcr)
 
     # System signals
@@ -79,45 +90,55 @@ async def rs_syndrome_test(dut):
     aresetn = dut.aresetn
 
     # Connect AXIS interdace
-
+    
     s_if = AxisIf(aclk=aclk,
                   tdata=dut.s_tdata,
                   tvalid=dut.s_tvalid,
                   tlast=dut.s_tlast,
                   tkeep=dut.s_tkeep,
                   width=BUS_WIDTH_IN_SYMB)
+
+    m_if = AxisIf(aclk=aclk,
+                  tdata=dut.syndrome,
+                  tvalid=dut.syndrome_vld,
+                  tlast=dut.syndrome_vld,
+                  width=ROOTS_NUM)
+                  
+    
+    syndrome = dut.syndrome
+    syndrome_vld = dut.syndrome_vld
     
     # Create TB components:
-    pkt_comp = Comparator('ENCODER comparator')
-    s_drv    = AxisDriver('s_drv', s_if)
+    pkt_comp  = Comparator('ENCODER comparator')
+    s_drv     = AxisDriver('s_drv', s_if)
     
-    s_q = []
-    s_mon    = AxisMonitor('s_mon', s_if, s_q, BUS_WIDTH_IN_SYMB, 0)
+    syndr_prd = SyndrPredictor('syndr_prd', pkt_comp.port_prd, ROOTS_NUM)
+    s_mon     = AxisMonitor('s_mon', s_if, syndr_prd.port_in, BUS_WIDTH_IN_SYMB, 0)
+    m_mon     = AxisMonitor('m_mon', m_if, pkt_comp.port_out, ROOTS_NUM, 0, 1)
 
     # Generate
     pkt = RsPacket(roots_num=ROOTS_NUM, word_size=BUS_WIDTH_IN_SYMB)
     
     pkt.generate(K_LEN)
-    pkt.corrupt()
+    pkt.corrupt(4)
     # START TEST
     await cocotb.start(reset_dut(aresetn,100))
     await Timer(50, units = "ns")
 
     await cocotb.start(custom_clock(aclk))
     await cocotb.start(s_mon.mon_if())
-
+    await cocotb.start(m_mon.mon_if())
+    
     await RisingEdge(aresetn)
     for i in range(10):
         await RisingEdge(aclk)
     await s_drv.send_pkt(pkt)
 
     for i in range (10):
-        await RisingEdge(aclk)
+        await RisingEdge(aclk)        
 
-    for pkt in s_q:        
-        msg = pkt.get_byte_list()
-        synd_prd = rs_calc_syndromes(msg, ROOTS_NUM)
-        print(f"synd_prd {synd_prd}")
+    syndr_prd.predict()
+    pkt_comp.compare()
     
 def rs_syndrome_tb():
 

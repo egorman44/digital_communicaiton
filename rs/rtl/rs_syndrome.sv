@@ -8,7 +8,7 @@ module rs_syndrome
    input 					 s_tlast,
    input [BUS_WIDTH_IN_SYMB-1:0] 		 s_tkeep,
    input [SYMB_WIDTH-1:0] 			 roots [ROOTS_NUM-1:0],
-   output logic [SYMB_WIDTH-1:0] 		 syndrome[ROOTS_NUM-1:0],
+   output [SYMB_WIDTH-1:0] 			 syndrome[ROOTS_NUM-1:0],
    output 					 syndrome_vld
    );
 
