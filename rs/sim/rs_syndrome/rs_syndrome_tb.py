@@ -31,16 +31,14 @@ from rs import rs_calc_syndromes
 # Load modules we need
 from coco_env.packet import Packet
 from coco_env.scoreboard import Comparator
+from coco_env.stimulus import reset_dut
+from coco_env.stimulus import custom_clock
 from coco_axis.axis import AxisDriver
 from coco_axis.axis import AxisResponder
 from coco_axis.axis import AxisMonitor
 from coco_axis.axis import AxisIf
-from enc_components import SyndrPredictor
-from enc_components import EncMonitor
-from enc_components import EncPacket
 
-from coco_env.helper_func import custom_clock
-from coco_env.helper_func import reset_dut
+from rs_lib import RsPacket
 
 # Parameters
 SYMB_WIDTH = 8
@@ -50,7 +48,7 @@ if(SYMB_WIDTH == 8):
     POLY = 285
     N_LEN = 255
     K_LEN = 239
-    ROOT_NUM = N_LEN-K_LEN    
+    ROOTS_NUM = N_LEN-K_LEN    
 elif(SYMB_WIDTH == 7):
     POLY = 137
 elif(SYMB_WIDTH == 6):
@@ -72,9 +70,9 @@ async def rs_syndrome_test(dut):
     root = []
     generator = 2
     fcr = 0
-    for i in range(ROOT_NUM):
+    for i in range(ROOTS_NUM):
         print(f"ROOT = {gf_pow(generator, i+fcr)}")
-        dut.root[i].value = gf_pow(generator, i+fcr)
+        dut.roots[i].value = gf_pow(generator, i+fcr)
 
     # System signals
     aclk = dut.aclk
@@ -93,11 +91,12 @@ async def rs_syndrome_test(dut):
     pkt_comp = Comparator('ENCODER comparator')
     s_drv    = AxisDriver('s_drv', s_if)
     
-    rs_syndr   = SyndrPredictor("rs_syndr", pkt_comp.port_prd, ROOT_NUM)
-    s_mon    = EncMonitor('s_mon', s_if, rs_syndr.port_in, BUS_WIDTH_IN_SYMB, 0, False, N_LEN, K_LEN)
+    s_q = []
+    s_mon    = AxisMonitor('s_mon', s_if, s_q, BUS_WIDTH_IN_SYMB, 0)
 
     # Generate
-    pkt = EncPacket(word_size=BUS_WIDTH_IN_SYMB, nsym=ROOT_NUM)
+    pkt = RsPacket(roots_num=ROOTS_NUM, word_size=BUS_WIDTH_IN_SYMB)
+    
     pkt.generate(K_LEN)
     pkt.corrupt()
     # START TEST
@@ -105,7 +104,6 @@ async def rs_syndrome_test(dut):
     await Timer(50, units = "ns")
 
     await cocotb.start(custom_clock(aclk))
-    #await cocotb.start(m_mon.mon_if())
     await cocotb.start(s_mon.mon_if())
 
     await RisingEdge(aresetn)
@@ -114,8 +112,12 @@ async def rs_syndrome_test(dut):
     await s_drv.send_pkt(pkt)
 
     for i in range (10):
-        await RisingEdge(aclk)            
-    rs_syndr.predict()
+        await RisingEdge(aclk)
+
+    for pkt in s_q:        
+        msg = pkt.get_byte_list()
+        synd_prd = rs_calc_syndromes(msg, ROOTS_NUM)
+        print(f"synd_prd {synd_prd}")
     
 def rs_syndrome_tb():
 
@@ -131,7 +133,7 @@ def rs_syndrome_tb():
     verilog_sources = []
     includes        = []
 
-    verilog_sources.append(proj_path / "lib" / "lib_mux_one_hot.sv")
+    verilog_sources.append(proj_path / "lib" / "lib_mux_onehot.sv")
     verilog_sources.append(proj_path / "lib" / "lib_ffs.sv")
     verilog_sources.append(proj_path / "lib" / "lib_mux_ffs.sv")
     verilog_sources.append(proj_path / "rs" / "rtl" / "gf_pkg.sv")
