@@ -8,8 +8,7 @@ module rs_syndrome_horney
     input 					  s_tlast,
     input [BUS_WIDTH_IN_SYMB-1:0] 		  s_tkeep,
     input [SYMB_WIDTH-1:0] 			  root,
-    output logic [SYMB_WIDTH-1:0] 		  syndrome,
-    output 					  syndrome_vld
+    output logic [SYMB_WIDTH-1:0] 		  syndrome
     );
 
    ///////////////////////////////////////
@@ -61,10 +60,10 @@ module rs_syndrome_horney
        .PORTS_NUMBER(BUS_WIDTH_IN_SYMB),
        .WIDTH(SYMB_WIDTH)
        )
-   lib_mux_ffs_hot_inst
+   lib_mux_ffs_inst
      (
       .base(base),
-      .sel_ffs(s_tkeep),
+      .sel_non_ffs(s_tkeep),
       .data_i(xor_intrm),
       .data_o(cycle_sum)
       );
@@ -85,6 +84,5 @@ module rs_syndrome_horney
    end // always_ff @ (posedge aclk, negedge aresetn)
 
    assign syndrome = cycle_sum;
-   assign syndrome_vld = s_tvalid && s_tlast;
 
 endmodule // rs_syndrome_horney
