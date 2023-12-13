@@ -23,7 +23,7 @@ module rs_bm
    
    logic [LEN_WIDTH+1:0]  error_locator_len_x2[ROOTS_NUM:0];
 
-   // TODO: check that it's a glitch of verilator. 
+   // There is no combo loop and following comment just to wave the Verilator
    /* verilator lint_off UNOPTFLAT */
    logic [LEN_WIDTH:0] 	  error_locator_len[ROOTS_NUM:0];
    /* verilator lint_on UNOPTFLAT */
@@ -36,7 +36,6 @@ module rs_bm
    poly_array_t syndrome_inv;
    poly_array_t syndrome_inv_vld;
    poly_array_t error_locator;
-   poly_array_t error_locator_vld;
    poly_array_t delta_intrm;
    poly_array_t aux_B;
    poly_array_t B_x_X;   
@@ -67,14 +66,15 @@ module rs_bm
 	    else begin
 	       syndrome_inv[root_indx][symb_indx] = '0;
 	    end
-	    //syndrome_inv_vld[root_indx][symb_indx] = error_locator_len_vld[root_indx][symb_indx] ? syndrome_inv[root_indx][symb_indx] : '0;
+	    syndrome_inv_vld[root_indx][symb_indx] = error_locator_len_vld[root_indx][symb_indx] ? syndrome_inv[root_indx][symb_indx] : '0;
 	 end
       end      
    end
    
    always_comb begin
-      
+      ////////////////////////////////////
       // Initialize algorithm
+      ////////////////////////////////////
       error_locator_len[0]	= 0;
       error_locator_len_x2[0]   = 0;
       delta[0]       		= 'x;
@@ -91,15 +91,16 @@ module rs_bm
 	    error_locator[0][symb_indx] = 0;
 	    aux_B[0][symb_indx] = 0;
 	 end
-	 error_locator_vld[0][symb_indx] = error_locator[0][symb_indx];
-      end
+      end // for (int symb_indx = 0; symb_indx < ROOTS_NUM; ++symb_indx)
       
+      ////////////////////////////////////
+      // Iterations started
+      ////////////////////////////////////      
       for(int i = 1; i < ROOTS_NUM + 1; ++i) begin
-
 	 // Sum upper limit is L(r-1), then syndrome_inv should be ANDed
 	 // with error_locator_len_vld to discard redundent items in error_locator[i-1]
 	 // TODO: delta[1] = syndr[0]
-	 delta_intrm[i]	= gf_poly_mult(syndrome_inv[i-1], error_locator_vld[i-1]);
+	 delta_intrm[i]	= gf_poly_mult(syndrome_inv_vld[i-1], error_locator[i-1]);
 	 delta[i]	= gf_poly_sum(delta_intrm[i]);
 	 delta_inv[i]	= gf_inv(delta[i]);
 	 
@@ -108,10 +109,10 @@ module rs_bm
 	 delta_x_B[i]		= gf_poly_mult_scalar(B_x_X[i], delta[i]);	 
 	 // If discrepancy is not equal to zero then modify LFSR:
 	 if(|delta[i]) begin
-	    error_locator[i]	= gf_poly_add(error_locator_vld[i-1], delta_x_B[i]);
+	    error_locator[i]	= gf_poly_add(error_locator[i-1], delta_x_B[i]);
 	    if(error_locator_len_x2[i-1] <= (i[LEN_WIDTH:0] - 1)) begin
 	       error_locator_len[i] = i[LEN_WIDTH:0] - error_locator_len[i-1];		  
-	       aux_B[i] = gf_poly_mult_scalar(error_locator_vld[i-1], delta_inv[i]);
+	       aux_B[i] = gf_poly_mult_scalar(error_locator[i-1], delta_inv[i]);
 	    end
 	    else begin
 	       error_locator_len[i] = error_locator_len[i-1];
@@ -121,12 +122,8 @@ module rs_bm
 	 else begin
 	    error_locator_len[i] = error_locator_len[i-1];
 	    aux_B[i] = gf_poly_mult_x(aux_B[i-1]);
-	    error_locator[i] = error_locator_vld[i-1];
+	    error_locator[i] = error_locator[i-1];
 	 end // else: !if(|delta[i])	 
-	 // TODO: rewrite syndrome_inv_vld
-	 for(int symb_indx = 0; symb_indx < ROOTS_NUM; ++symb_indx) begin
-	    error_locator_vld[i][symb_indx] = error_locator_len_vld[i][symb_indx] ? error_locator[i][symb_indx] : '0;
-	 end	   
       end	   
    end // always_comb
 
