@@ -32,6 +32,8 @@ module rs_syndrome_horney
    end
 
    wire sop = s_tvalid && ~s_tvalid_q;
+
+   // Horney method check https://en.wikiversity.org/wiki/Reed%E2%80%93Solomon_codes_for_coders
    
    logic [SYMB_WIDTH-1:0] gf_mult_intrm [BUS_WIDTH_IN_SYMB-1:0];
    always_comb begin
