@@ -110,6 +110,8 @@ def init_tables(prim=0x11d, generator=2, c_exp=8):
     # To do that, we generate the Galois Field F(2^p) by building a list starting with the element 0 followed by the (p-1) successive powers of the generator a : 1, a, a^1, a^2, ..., a^(p-1).
     x = 1
     for i in xrange(field_charac): # we could skip index 255 which is equal to index 0 because of modulo: g^255==g^0 but either way, this does not change the later outputs (ie, the ecc symbols will be the same either way)
+        #print(f"gf_exp[{i}] = {x}")        
+        #print(f"gf_log[{x}] = {i}")
         gf_exp[i] = x # compute anti-log for this value and store it in a table
         gf_log[x] = i # compute log at the same time
         x = gf_mult_noLUT(x, generator, prim, field_charac+1)
@@ -314,4 +316,84 @@ def rs_calc_syndromes(msg, nsym, fcr=0, generator=2):
         synd[i] = gf_poly_eval(msg, gf_pow(generator, i+fcr))
     return [0] + synd # pad with one 0 for mathematical precision (else we can end up with weird calculations sometimes)
 
+# nsym = number of roots
+def rs_find_error_locator(synd, nsym, erase_loc=None, erase_count=0):
+    '''Find error/errata locator and evaluator polynomials with Berlekamp-Massey algorithm'''
+    # The idea is that BM will iteratively estimate the error locator polynomial.
+    # To do this, it will compute a Discrepancy term called Delta, which will tell us if the error locator polynomial needs an update or not
+    # (hence why it's called discrepancy: it tells us when we are getting off board from the correct value).
+
+    # Init the polynomials
+    if erase_loc: # if the erasure locator polynomial is supplied, we init with its value, so that we include erasures in the final locator polynomial
+        err_loc = list(erase_loc)
+        old_loc = list(erase_loc)
+    else:
+        err_loc = [1] # This is the main variable we want to fill, also called Sigma in other notations or more formally the errors/errata locator polynomial.
+        old_loc = [1] # BM is an iterative algorithm, and we need the errata locator polynomial of the previous iteration in order to update other necessary variables.
+    #L = 0 # update flag variable, not needed here because we use an alternative equivalent way of checking if update is needed (but using the flag could potentially be faster depending on if using length(list) is taking linear time in your language, here in Python it's constant so it's as fast.
+    # Fix the syndrome shifting: when computing the syndrome, some implementations may prepend a 0 coefficient for the lowest degree term (the constant). This is a case of syndrome shifting, thus the syndrome will be bigger than the number of ecc symbols (I don't know what purpose serves this shifting). If that's the case, then we need to account for the syndrome shifting when we use the syndrome such as inside BM, by skipping those prepended coefficients.
+    # Another way to detect the shifting is to detect the 0 coefficients: by definition, a syndrome does not contain any 0 coefficient (except if there are no errors/erasures, in this case they are all 0). This however doesn't work with the modified Forney syndrome, which set to 0 the coefficients corresponding to erasures, leaving only the coefficients corresponding to errors.
+    synd_shift = 0
+    if len(synd) > nsym: synd_shift = len(synd) - nsym
+    print(f"synd {synd}")
+    print(f"len(synd) / nsym {len(synd)} {nsym}")
+    for i in xrange(nsym-erase_count): # generally: nsym-erase_count == len(synd), except when you input a partial erase_loc and using the full syndrome instead of the Forney syndrome, in which case nsym-erase_count is more correct (len(synd) will fail badly with IndexError).
+        if erase_loc: # if an erasures locator polynomial was provided to init the errors locator polynomial, then we must skip the FIRST erase_count iterations (not the last iterations, this is very important!)
+            K = erase_count+i+synd_shift
+        else: # if erasures locator is not provided, then either there's no erasures to account or we use the Forney syndromes, so we don't need to use erase_count nor erase_loc (the erasures have been trimmed out of the Forney syndromes).
+            K = i+synd_shift
+        # Compute the discrepancy Delta
+        # Here is the close-to-the-books operation to compute the discrepancy Delta: it's a simple polynomial multiplication of error locator with the syndromes, and then we get the Kth element.
+        #delta = gf_poly_mul(err_loc[::-1], synd)[K] # theoretically it should be gf_poly_add(synd[::-1], [1])[::-1] instead of just synd, but it seems it's not absolutely necessary to correctly decode.
+        # But this can be optimized: since we only need the Kth element, we don't need to compute the polynomial multiplication for any other element but the Kth. Thus to optimize, we compute the polymul only at the item we need, skipping the rest (avoiding a nested loop, thus we are linear time instead of quadratic).
+        # This optimization is actually described in several figures of the book "Algebraic codes for data transmission", Blahut, Richard E., 2003, Cambridge university press.
+        print(f"\n K = {K}")
+        delta = synd[K]
+        for j in xrange(1, len(err_loc)):
+            print(f"err_loc/synd = {err_loc[-(j+1)]:x} / {synd[K - j]:x}")
+            delta ^= gf_mul(err_loc[-(j+1)], synd[K - j]) # delta is also called discrepancy. Here we do a partial polynomial multiplication (ie, we compute the polynomial multiplication only for the term of degree K). Should be equivalent to brownanrs.polynomial.mul_at().
+            
+        #print "delta", K, delta, list(gf_poly_mul(err_loc[::-1], synd)) # debugline
+
+        # Shift polynomials to compute the next degree
+        old_loc = old_loc + [0]
+        
+        print(f"delta[{K}] = {delta:x}")
+        # Iteratively estimate the errata locator and evaluator polynomials
+        if delta != 0: # Update only if there's a discrepancy
+            if len(old_loc) > len(err_loc): # Rule B (rule A is implicitly defined because rule A just says that we skip any modification for this iteration)
+            #if 2*L <= K+erase_count: # equivalent to len(old_loc) > len(err_loc), as long as L is correctly computed
+                # Computing errata locator polynomial Sigma            
+                new_loc = gf_poly_scale(old_loc, delta)
+                old_loc = gf_poly_scale(err_loc, gf_inverse(delta)) # effectively we are doing err_loc * 1/delta = err_loc // delta
+                err_loc = new_loc
+                # Update the update flag
+                #L = K - L # the update flag L is tricky: in Blahut's schema, it's mandatory to use `L = K - L - erase_count` (and indeed in a previous draft of this function, if you forgot to do `- erase_count` it would lead to correcting only 2*(errors+erasures) <= (n-k) instead of 2*errors+erasures <= (n-k)), but in this latest draft, this will lead to a wrong decoding in some cases where it should correctly decode! Thus you should try with and without `- erase_count` to update L on your own implementation and see which one works OK without producing wrong decoding failures.
+
+           # Update with the discrepancy
+            dbg_str = "err_loc_inrm : "
+            for item in err_loc:
+               dbg_str = dbg_str + f"0x{item:x} "
+            print(dbg_str)
+            dbg_str = "old_loc_inrm : "
+            for item in old_loc:
+               dbg_str = dbg_str + f"0x{item:x} "
+            print(dbg_str)
+            err_loc = gf_poly_add(err_loc, gf_poly_scale(old_loc, delta))
+        print(f"len(err_loc) = {len(err_loc)-1}")
+        dbg_str = "err_loc : "
+        for item in err_loc:
+            dbg_str = dbg_str + f"0x{item:x} "
+        print(dbg_str)
+        dbg_str = "old_loc : "
+        for item in old_loc:
+            dbg_str = dbg_str + f"0x{item:x} "
+        print(dbg_str)
+    # Check if the result is correct, that there's not too many errors to correct
+    while len(err_loc) and err_loc[0] == 0: del err_loc[0] # drop leading 0s, else errs will not be of the correct size
+    errs = len(err_loc) - 1
+    if (errs-erase_count) * 2 + erase_count > nsym:
+        raise ReedSolomonError("Too many errors to correct")    # too many errors to correct
+
+    return err_loc
 
