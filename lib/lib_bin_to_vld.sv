@@ -19,16 +19,11 @@ module lib_bin_to_vld
    input [BIN_WDTH-1:0]   bin,
    output [VLD_WIDTH-1:0] vld   
    );
+   
+   wire [VLD_WIDTH-1:0]   vld_tbl[VLD_WIDTH-1:0];
 
-   localparam BIN_MAX = 2 ** BIN_WDTH;
-
-   wire [VLD_WIDTH-1:0]   vld_tbl[BIN_MAX-1:0];
-
-   for(genvar i = 0; i < BIN_MAX; ++i) begin : GEN_VLD_TBL
-      if(i < VLD_WIDTH)
-	assign vld_tbl[i] = {{VLD_WIDTH-i-1{1'b0}} , {i+1{1'b1}}};
-      else
-	assign vld_tbl[i] = 'x;
+   for(genvar i = 0; i < VLD_WIDTH; ++i) begin : GEN_VLD_TBL
+      assign vld_tbl[i] = {{VLD_WIDTH-i-1{1'b0}} , {i+1{1'b1}}};
    end
       
    assign vld = vld_tbl[bin];
