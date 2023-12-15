@@ -1,13 +1,16 @@
 module rs_bm
   import gf_pkg::*;
-  (
-   input 		  aclk,
-   input 		  aresetn,
-   input [SYMB_WIDTH-1:0] syndrome[ROOTS_NUM-1:0],
-   input 		  syndrome_vld,
-   output 		  poly_t_t error_locator_out,
-   output 		  error_locator_vld
-   );
+   #(
+     parameter PIPELINE = 1
+     )
+   (
+    input 		   aclk,
+    input 		   aresetn,
+    input [SYMB_WIDTH-1:0] syndrome[ROOTS_NUM-1:0],
+    input 		   syndrome_vld,
+    output 		   poly_t error_locator_out,
+    output 		   error_locator_vld
+    );
    
    // TODO: do I need to implement eraser ?! 
    
@@ -23,9 +26,8 @@ module rs_bm
 
    // There is no combo loop and following comment just to wave the Verilator
    /* verilator lint_off UNOPTFLAT */
-   logic [LEN_WIDTH-1:0]  error_locator_len[ROOTS_NUM:0];
+   logic [LEN_WIDTH-1:0] error_locator_len[ROOTS_NUM:0];
    /* verilator lint_on UNOPTFLAT */
-   
    logic [T_LEN:0] error_locator_len_vld[ROOTS_NUM:0];
    
    logic [SYMB_WIDTH-1:0] delta [ROOTS_NUM:0];
@@ -96,33 +98,119 @@ module rs_bm
 	 // Sum upper limit is L(r-1), then syndrome_inv should be ANDed
 	 // with error_locator_len_vld to discard redundent items in error_locator[i-1]
 	 // TODO: delta[1] = syndr[0]
-	 delta_intrm[i]	= gf_poly_mult(syndrome_inv_vld[i-1], error_locator[i-1]);
+	 delta_intrm[i]	= gf_poly_mult(syndrome_inv_vld[i-1], error_locator_intrm[i-1]);
 	 delta[i]	= gf_poly_sum(delta_intrm[i]);
 	 delta_inv[i]	= gf_inv(delta[i]);
 	 
-	 error_locator_len_x2[i-1] = {error_locator_len[i-1], 1'b0};
-	 B_x_X[i]		= gf_poly_mult_x(aux_B[i-1]);
+	 error_locator_len_x2[i-1] = {error_locator_len_intrm[i-1], 1'b0};
+	 B_x_X[i]		= gf_poly_mult_x(aux_B_intrm[i-1]);
 	 delta_x_B[i]		= gf_poly_mult_scalar(B_x_X[i], delta[i]);	 
 	 // If discrepancy is not equal to zero then modify LFSR:
 	 if(|delta[i]) begin
-	    error_locator[i]	= gf_poly_add(error_locator[i-1], delta_x_B[i]);
+	    error_locator[i]	= gf_poly_add(error_locator_intrm[i-1], delta_x_B[i]);
 	    if(error_locator_len_x2[i-1] <= (i[LEN_WIDTH-1:0] - 1)) begin
-	       error_locator_len[i] = i[LEN_WIDTH-1:0] - error_locator_len[i-1];		  
-	       aux_B[i] = gf_poly_mult_scalar(error_locator[i-1], delta_inv[i]);
+	       error_locator_len[i] = i[LEN_WIDTH-1:0] - error_locator_len_intrm[i-1];		  
+	       aux_B[i] = gf_poly_mult_scalar(error_locator_intrm[i-1], delta_inv[i]);
 	    end
 	    else begin
-	       error_locator_len[i] = error_locator_len[i-1];
-	       aux_B[i] = gf_poly_mult_x(aux_B[i-1]);
+	       error_locator_len[i] = error_locator_len_intrm[i-1];
+	       aux_B[i] = gf_poly_mult_x(aux_B_intrm[i-1]);
 	    end	    
 	 end
 	 else begin
-	    error_locator_len[i] = error_locator_len[i-1];
-	    aux_B[i] = gf_poly_mult_x(aux_B[i-1]);
-	    error_locator[i] = error_locator[i-1];
+	    error_locator_len[i] = error_locator_len_intrm[i-1];
+	    aux_B[i] = gf_poly_mult_x(aux_B_intrm[i-1]);
+	    error_locator[i] = error_locator_intrm[i-1];
 	 end // else: !if(|delta[i])	 
       end	   
    end // always_comb
 
-   assign error_locator_out = error_locator[ROOTS_NUM];
+   /////////////////////////////////////////
+   // Add pipeline for each iteration
+   // Or use it as a combinatorial if you want
+   // to apply the synthesizer retiming to reduce 
+   // the number of pipe stages.
+   /////////////////////////////////////////   
+   
+   logic [ROOTS_NUM:1] 	 syndrome_vld_pipe;
+   logic [LEN_WIDTH-1:0] error_locator_len_pipe[ROOTS_NUM:1];   
+   poly_array_q_t error_locator_pipe;
+   poly_array_q_t aux_B_pipe;
+   
+   if(PIPELINE != 0) begin : GEN_PIPELINED      
+      
+      always_ff @(posedge aclk, negedge aresetn) begin
+	 if(~aresetn) begin
+	    syndrome_vld_pipe <= '0;
+	 end
+	 else begin
+	    for(int i = 1; i < ROOTS_NUM+1; ++i) begin
+	       if(i == 1)
+		 syndrome_vld_pipe[i] <= syndrome_vld;
+	       else
+		 syndrome_vld_pipe[i] <= syndrome_vld_pipe[i-1];
+	    end
+	 end // else: !if(~aresetn)
+      end
+   
+      always_ff @(posedge aclk, negedge aresetn) begin
+      	 for(int i = 1; i < ROOTS_NUM+1; ++i) begin
+	    error_locator_pipe[i]	<= error_locator[i];
+	    error_locator_len_pipe[i]	<= error_locator_len[i];
+	    aux_B_pipe[i]		<= aux_B[i];
+         end
+      end   
+      
+   end
+   else begin : GEN_NON_PIPELINED
+
+      always_comb begin
+	 for(int i = 1; i < ROOTS_NUM+1; ++i) begin
+	    if(i == 0)
+	      syndrome_vld_pipe[i]	= syndrome_vld;
+	    else
+	      syndrome_vld_pipe[i]	= syndrome_vld_pipe[i-1];
+	    error_locator_pipe[i]	= error_locator[i];
+	    error_locator_len_pipe[i]	= error_locator_len[i];
+	    aux_B_pipe[i]		= aux_B[i];
+	 end
+      end
+   
+    end // block: GEN_NON_PIPELINED
+
+   /////////////////////////////////////////
+   // Not to brake down algorithm combo loop
+   // add inrm signals that should be connected
+   // to the initial values and pipe values
+   /////////////////////////////////////////
+
+   // There is no combo loop and following comment just to wave the Verilator
+   /* verilator lint_off UNOPTFLAT */
+   logic [LEN_WIDTH-1:0] error_locator_len_intrm[ROOTS_NUM:0];
+   poly_array_t error_locator_intrm;
+   poly_array_t aux_B_intrm;
+   /* verilator lint_on UNOPTFLAT */
+
+   always_comb begin
+      for(int i = 0; i < ROOTS_NUM+1; ++i) begin
+	 if(i == 0) begin
+	    error_locator_intrm[i]	= error_locator[i];
+	    error_locator_len_intrm[i]	= error_locator_len[i];
+	    aux_B_intrm[i]		= aux_B[i];
+	 end
+	 else begin
+	    error_locator_intrm[i]	= error_locator_pipe[i];
+	    error_locator_len_intrm[i]	= error_locator_len_pipe[i];
+	    aux_B_intrm[i]		= aux_B_pipe[i];
+	 end
+      end
+   end
+
+   /////////////////////////////////////////
+   // Output assignment
+   /////////////////////////////////////////
+   
+   assign error_locator_out = error_locator_pipe[ROOTS_NUM];
+   assign error_locator_vld = syndrome_vld_pipe[ROOTS_NUM];
    
 endmodule // rs_bs
