@@ -5,30 +5,28 @@ module rs_bm
    input 		  aresetn,
    input [SYMB_WIDTH-1:0] syndrome[ROOTS_NUM-1:0],
    input 		  syndrome_vld,
-   output 		  decode_error
+   output 		  poly_t_t error_locator_out,
+   output 		  error_locator_vld
    );
    
-   // TODO: there is no need to have the ROOTS_NUM width,
-   // since if error_locator_len > ROOTS_NUM/2 then we couln't
-   // decode the message properly.
+   // TODO: do I need to implement eraser ?! 
    
-   // TODO: check the width of error_locator_len
-
    // TODO: add retiming
+   
    //////////////////////////////////////////////
    // error_locator_len - keeps track of the length of the error_locator
    //   start with 0 the max size is T_VAL+1.
    //   T_VAL+1 is an error state.
    //////////////////////////////////////////////
    
-   logic [LEN_WIDTH+1:0]  error_locator_len_x2[ROOTS_NUM:0];
+   logic [LEN_WIDTH:0]  error_locator_len_x2[ROOTS_NUM:0];
 
    // There is no combo loop and following comment just to wave the Verilator
    /* verilator lint_off UNOPTFLAT */
-   logic [LEN_WIDTH:0] 	  error_locator_len[ROOTS_NUM:0];
+   logic [LEN_WIDTH-1:0]  error_locator_len[ROOTS_NUM:0];
    /* verilator lint_on UNOPTFLAT */
    
-   logic [ROOTS_NUM:0] 	  error_locator_len_vld[ROOTS_NUM:0];
+   logic [T_LEN:0] error_locator_len_vld[ROOTS_NUM:0];
    
    logic [SYMB_WIDTH-1:0] delta [ROOTS_NUM:0];
    logic [SYMB_WIDTH-1:0] delta_inv [ROOTS_NUM:0];
@@ -41,12 +39,10 @@ module rs_bm
    poly_array_t B_x_X;   
    poly_array_t delta_x_B;   
    
-   // TODO: Check VLD_WIDTH, why is it ROOTS_NUM+1, it should be ROOTS_NUM.
-   
    for(genvar i = 0; i < ROOTS_NUM+1; ++i) begin : GEN_ERR_LEN_BIN_TO_VLD
       lib_bin_to_vld 
 		  #(
-		    .VLD_WIDTH(ROOTS_NUM+1)
+		    .VLD_WIDTH(T_LEN+1)
 		    )
       err_len_to_vld
 		  (
@@ -110,8 +106,8 @@ module rs_bm
 	 // If discrepancy is not equal to zero then modify LFSR:
 	 if(|delta[i]) begin
 	    error_locator[i]	= gf_poly_add(error_locator[i-1], delta_x_B[i]);
-	    if(error_locator_len_x2[i-1] <= (i[LEN_WIDTH:0] - 1)) begin
-	       error_locator_len[i] = i[LEN_WIDTH:0] - error_locator_len[i-1];		  
+	    if(error_locator_len_x2[i-1] <= (i[LEN_WIDTH-1:0] - 1)) begin
+	       error_locator_len[i] = i[LEN_WIDTH-1:0] - error_locator_len[i-1];		  
 	       aux_B[i] = gf_poly_mult_scalar(error_locator[i-1], delta_inv[i]);
 	    end
 	    else begin
@@ -127,24 +123,6 @@ module rs_bm
       end	   
    end // always_comb
 
-   // TODO: add clear
-   logic too_many_errors_q, too_many_errors;
-   logic clear;
-
-   //assign too_many_errors = (error_locator_len > T_VAL+1);
-   
-   always_ff @(posedge aclk, negedge aresetn) begin
-      if(~aresetn)
-	too_many_errors_q <= '0;
-      else begin
-	 if(clear)
-	   too_many_errors_q <= '0;
-	 // TODO: check value
-	 else
-	   too_many_errors_q <= too_many_errors;
-      end
-   end // always_ff @ (posedge aclk, negedge aresetn)
-
-   assign decode_error = ~too_many_errors_q && too_many_errors;
+   assign error_locator_out = error_locator[ROOTS_NUM];
    
 endmodule // rs_bs

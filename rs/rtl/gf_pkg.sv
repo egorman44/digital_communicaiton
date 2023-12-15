@@ -19,23 +19,23 @@ package gf_pkg;
    parameter N_LEN	= `N_LEN;
    parameter K_LEN	= `K_LEN;
    parameter ROOTS_NUM  = N_LEN-K_LEN;
-   parameter T_VAL	= ROOTS_NUM / 2;
+   parameter T_LEN	= ROOTS_NUM / 2;
+   
    parameter SYMB_WIDTH = `SYMB_WIDTH;
    parameter POLY	= `POLY;
    parameter SYMB_NUM	= 2 ** SYMB_WIDTH;   
    parameter BUS_WIDTH_IN_SYMB = `BUS_WIDTH_IN_SYMB;
    parameter FIRST_ROOT = 1;
-   parameter LEN_WIDTH = $clog2(SYMB_WIDTH+1);
+   parameter LEN_WIDTH = $clog2(T_LEN+1);
 
    typedef logic [SYMB_WIDTH-1:0] alpha_to_symb_t [SYMB_NUM-1:0];
 
    typedef logic [SYMB_WIDTH-1:0] alpha_t;
    typedef logic [SYMB_WIDTH-1:0] symb_t;
-   typedef logic [SYMB_WIDTH-1:0] poly_t [ROOTS_NUM-1:0];
-   typedef logic [ROOTS_NUM-1:0][SYMB_WIDTH-1:0] poly_pack_t;
+   typedef logic [SYMB_WIDTH-1:0] poly_t [T_LEN:0];
+   
    // The size should be ROOTS_NUM+1 to use in BM 
    typedef poly_t poly_array_t [ROOTS_NUM:0];
-   typedef poly_pack_t poly_pack_array_t [ROOTS_NUM-1:0];
       
    //////////////////////////////////////
    // Generate all alpha elements using LFSR rule.   
