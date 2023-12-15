@@ -88,9 +88,9 @@ async def rs_syndrome_test(dut):
 
     # Generate
     # reference message:
-    ref_msg = RsPacket(roots_num=ROOTS_NUM, word_size=BUS_WIDTH_IN_SYMB, corrupt_words_num=7)
+    ref_msg = RsPacket(roots_num=ROOTS_NUM, word_size=BUS_WIDTH_IN_SYMB, corrupt_words_num=5)
     ref_msg.generate(K_LEN, 1)
-    ref_msg.print_pkt("REFEENCE MSG")
+    ref_msg.print_pkt("ENC_MSG_CORRUPT")
     
     pkt = RsSyndromePacket(roots_num=ROOTS_NUM, word_size=BUS_WIDTH_IN_SYMB)
     pkt.generate(ref_pkt=ref_msg)
@@ -111,7 +111,7 @@ async def rs_syndrome_test(dut):
         await RisingEdge(aclk)
     await s_drv.send_pkt(pkt)
 
-    for i in range (10):
+    for i in range (ROOTS_NUM*2):
         await RisingEdge(aclk)        
 
 
