@@ -1,4 +1,4 @@
-module rs_syndrome_horney
+module rs_syndrome_horner
   import gf_pkg::*;
    (
     input 					  aclk,
@@ -12,7 +12,7 @@ module rs_syndrome_horney
     );
 
    ///////////////////////////////////////
-   // Horneys_method
+   // Horner's method
    ///////////////////////////////////////
    
    logic [SYMB_WIDTH-1:0] xor_intrm [BUS_WIDTH_IN_SYMB-1:0];
@@ -33,7 +33,7 @@ module rs_syndrome_horney
 
    wire sop = s_tvalid && ~s_tvalid_q;
 
-   // Horney method check https://en.wikiversity.org/wiki/Reed%E2%80%93Solomon_codes_for_coders
+   // Horner method check https://en.wikiversity.org/wiki/Reed%E2%80%93Solomon_codes_for_coders
    
    logic [SYMB_WIDTH-1:0] gf_mult_intrm [BUS_WIDTH_IN_SYMB-1:0];
    always_comb begin
@@ -87,4 +87,5 @@ module rs_syndrome_horney
 
    assign syndrome = cycle_sum;
 
-endmodule // rs_syndrome_horney
+endmodule // rs_syndrome_horner
+
