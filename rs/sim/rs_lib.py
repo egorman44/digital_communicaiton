@@ -62,4 +62,26 @@ class SyndrPredictor(Predictor):
             syndr_pkt.print_pkt(self.name)
             self.port_prd.append(syndr_pkt)
 
-#class ErrLocatorPredictor(Predictor):    
+class ErrLocatorPredictor(Predictor):    
+
+    def __init__(self, name, port_prd, roots_num):
+        super().__init__(name, port_prd)
+        self.roots_num = roots_num
+        
+    def predict(self):
+        t_len = int(self.roots_num/2) + 1
+        for pkt in self.port_in:
+            syndrome = rs_calc_syndromes(pkt.get_byte_list(), self.roots_num)
+            err_locator = rs_find_error_locator(syndrome, self.roots_num)
+            print(f"err_locator = {err_locator}")
+            err_locator.reverse()
+            print(f"err_locator = {err_locator}")
+            if(len(err_locator) < t_len):
+               zeros = [0] * (t_len - len(err_locator))
+               err_locator = err_locator + zeros
+               print(f"err_locator = {err_locator}")
+            syndr_pkt = Packet(t_len)
+            syndr_pkt.pkt_size = t_len
+            syndr_pkt.write_byte_list(err_locator)
+            syndr_pkt.print_pkt(self.name)
+            self.port_prd.append(syndr_pkt)
