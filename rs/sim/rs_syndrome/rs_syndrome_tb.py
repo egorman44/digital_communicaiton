@@ -40,17 +40,7 @@ from coco_axis.axis import AxisIf
 
 from rs_lib import RsPacket
 from rs_lib import SyndrPredictor
-
-# syndrome monitor
-
-async def syndr_mon(clk, syndr_vld, syndr, aport):
-    while(True):
-        await RisingEdge(clk)
-        if(syndr_vld.value == 1):
-            syndr_int = []
-            for i in range (len(syndr.value)):
-                syndr_int.append(syndr.value[i].integer)
-            aport.append(syndr_int)
+from rs_lib import RsSyndromePacket
 
 # Parameters
 SYMB_WIDTH = 8
