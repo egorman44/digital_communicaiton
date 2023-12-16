@@ -36,6 +36,7 @@ package gf_pkg;
    
    // The size should be ROOTS_NUM+1 to use in BM 
    typedef poly_t poly_array_t [ROOTS_NUM:0];
+   typedef poly_t poly_array_q_t [ROOTS_NUM:1];
       
    //////////////////////////////////////
    // Generate all alpha elements using LFSR rule.   
