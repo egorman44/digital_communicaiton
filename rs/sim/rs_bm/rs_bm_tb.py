@@ -42,6 +42,7 @@ from rs_lib import RsPacket
 from rs_lib import SyndrPredictor
 from rs_lib import RsSyndromePacket
 from rs_lib import RsErrLocatorPacket
+from rs_lib import ErrLocatorPredictor
 
 # Parameters
 SYMB_WIDTH = 8
@@ -51,7 +52,6 @@ if(SYMB_WIDTH == 8):
     POLY = 285
     N_LEN = 255
     K_LEN = 239
-    ROOTS_NUM = N_LEN-K_LEN    
 elif(SYMB_WIDTH == 7):
     POLY = 137
 elif(SYMB_WIDTH == 6):
@@ -65,9 +65,12 @@ elif(SYMB_WIDTH == 3):
 elif(SYMB_WIDTH == 2):
     POLY = 7
 
+ROOTS_NUM = N_LEN-K_LEN
+T_LEN = ROOTS_NUM/2
+
 @cocotb.test()
 async def rs_syndrome_test(dut):
-    random.seed(10)
+    #random.seed(10)
     init_tables()
 
     # System signals
@@ -81,16 +84,30 @@ async def rs_syndrome_test(dut):
                   tlast=dut.syndrome_vld,
                   width=ROOTS_NUM)
 
-    # Create TB components:    
+    m_if = AxisIf(aclk=aclk,
+                  tdata=dut.error_locator_out,
+                  tvalid=dut.error_locator_vld,
+                  tlast=dut.error_locator_vld,
+                  width=T_LEN+1)
+
+    # Create TB components:
+    pkt_comp  = Comparator('BM comparator')
     s_drv     = AxisDriver('s_drv', s_if, ROOTS_NUM, 1)
     port_in = []
+    predictor = ErrLocatorPredictor('err_loc_prd', pkt_comp.port_prd, ROOTS_NUM)
     s_mon     = AxisMonitor('s_mon', s_if, port_in, ROOTS_NUM, 0, 1)
+    m_mon     = AxisMonitor('m_mon', m_if, pkt_comp.port_out, T_LEN+1, 0, 1)
+    
 
     # Generate
     # reference message:
-    ref_msg = RsPacket(roots_num=ROOTS_NUM, word_size=BUS_WIDTH_IN_SYMB, corrupt_words_num=5)
+    corrupt_words_num = random.randint(1,T_LEN)
+    ref_msg = RsPacket(roots_num=ROOTS_NUM, word_size=BUS_WIDTH_IN_SYMB, corrupt_words_num=corrupt_words_num)
     ref_msg.generate(K_LEN, 1)
     ref_msg.print_pkt("ENC_MSG_CORRUPT")
+
+    # 
+    predictor.port_in.append(ref_msg)
     
     pkt = RsSyndromePacket(roots_num=ROOTS_NUM, word_size=BUS_WIDTH_IN_SYMB)
     pkt.generate(ref_pkt=ref_msg)
@@ -105,15 +122,18 @@ async def rs_syndrome_test(dut):
 
     await cocotb.start(custom_clock(aclk))
     await cocotb.start(s_mon.mon_if())
-
+    await cocotb.start(m_mon.mon_if())
+    
     await RisingEdge(aresetn)
     for i in range(10):
         await RisingEdge(aclk)
     await s_drv.send_pkt(pkt)
-
+    
     for i in range (ROOTS_NUM*2):
         await RisingEdge(aclk)        
 
+    predictor.predict()
+    pkt_comp.compare()
 
 
 def rs_bm_tb():
