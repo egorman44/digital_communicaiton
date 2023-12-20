@@ -11,9 +11,6 @@ from pathlib import Path
 dig_com_path = get_path('DIGITAL_COMMUNICAITON')
 coco_path = get_path('COCO_PATH')
 
-sys.path.append(dig_com_path + "/rs/python")
-sys.path.append(dig_com_path + "/rs/sim")
-sys.path.append(coco_path)
 
 # Import COCOTB
 import cocotb
