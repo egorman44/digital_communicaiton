@@ -16,7 +16,7 @@ module rs_syndrome_root
    // End of automatics
    );
    
-   rs_syndrome_horney rs_syndrome_horney(/*AUTOINST*/
+   rs_syndrome_horner rs_syndrome_horner(/*AUTOINST*/
 					 // Outputs
 					 .syndrome		(syndrome[SYMB_WIDTH-1:0]),
 					 // Inputs
