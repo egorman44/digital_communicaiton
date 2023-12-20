@@ -397,3 +397,48 @@ def rs_find_error_locator(synd, nsym, erase_loc=None, erase_count=0):
 
     return err_loc
 
+def rs_find_errata_locator(e_pos, generator=2):
+    '''Compute the erasures/errors/errata locator polynomial from the erasures/errors/errata positions
+       (the positions must be relative to the x coefficient, eg: "hello worldxxxxxxxxx" is tampered to "h_ll_ worldxxxxxxxxx"
+       with xxxxxxxxx being the ecc of length n-k=9, here the string positions are [1, 4], but the coefficients are reversed
+       since the ecc characters are placed as the first coefficients of the polynomial, thus the coefficients of the
+       erased characters are n-1 - [1, 4] = [18, 15] = erasures_loc to be specified as an argument.'''
+
+    e_loc = [1] # just to init because we will multiply, so it must be 1 so that the multiplication starts correctly without nulling any term
+    # erasures_loc = product(1 - x*alpha**i) for i in erasures_pos and where alpha is the alpha chosen to evaluate polynomials.
+    for i in e_pos:
+        e_loc = gf_poly_mul( e_loc, gf_poly_add([1], [gf_pow(generator, i), 0]) )
+    return e_loc
+
+def rs_find_error_evaluator(synd, err_loc, nsym):
+    '''Compute the error (or erasures if you supply sigma=erasures locator polynomial, or errata) evaluator polynomial Omega
+       from the syndrome and the error/erasures/errata locator Sigma.'''
+
+    # Omega(x) = [ Synd(x) * Error_loc(x) ] mod x^(n-k+1)
+    _, remainder = gf_poly_div( gf_poly_mul(synd, err_loc), ([1] + [0]*(nsym+1)) ) # first multiply syndromes * errata_locator, then do a
+                                                                                   # polynomial division to truncate the polynomial to the
+                                                                                   # required length
+
+    # Faster way that is equivalent
+    #remainder = gf_poly_mul(synd, err_loc) # first multiply the syndromes with the errata locator polynomial
+    #remainder = remainder[len(remainder)-(nsym+1):] # then slice the list to truncate it (which represents the polynomial), which
+                                                     # is equivalent to dividing by a polynomial of the length we want
+
+    return remainder
+
+def rs_find_errors(err_loc, nmess, generator=2): # nmess is len(msg_in)
+    '''Find the roots (ie, where evaluation = zero) of error polynomial by brute-force trial, this is a sort of Chien's search
+    (but less efficient, Chien's search is a way to evaluate the polynomial such that each evaluation only takes constant time).'''
+    errs = len(err_loc) - 1
+    err_pos = []
+    print(f"err_loc = {err_loc}")
+    for i in xrange(nmess): # normally we should try all 2^8 possible values, but here we optimize to just check the interesting symbols
+        print(f" gf_poly_eval(err_loc,{gf_pow(generator, i)}) = {gf_poly_eval(err_loc, gf_pow(generator, i))}")
+        if gf_poly_eval(err_loc, gf_pow(generator, i)) == 0: # It's a 0? Bingo, it's a root of the error locator polynomial,
+                                                        # in other terms this is the location of an error
+            err_pos.append(nmess - 1 - i)
+    # Sanity check: the number of errors/errata positions found should be exactly the same as the length of the errata locator polynomial
+    if len(err_pos) != errs:
+        # couldn't find error locations
+        raise ReedSolomonError("Too many (or few) errors found by Chien Search for the errata locator polynomial!")
+    return err_pos
