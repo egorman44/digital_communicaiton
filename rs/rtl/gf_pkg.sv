@@ -129,6 +129,28 @@ package gf_pkg;
       alpha_inv = SYMB_NUM - 1 - symb_to_alpha(symb);
       gf_inv	= alpha_to_symb(alpha_inv);
    endfunction // gf_inv
+
+   //////////////////////////////////////   
+   //  gf_poly_eval function evaluates a polynomial at a particular value of x
+   //////////////////////////////////////
+
+   function symb_t gf_poly_eval(poly_t poly, symb_t symb);
+      logic [SYMB_WIDTH-1:0] gf_mult_intrm[T_LEN-1:0];
+      logic [SYMB_WIDTH-1:0] xor_intrm[T_LEN-1:0];
+      //$display("*** GF_POLY_EVAL***");
+      
+      for(int i = 0; i < T_LEN; ++i) begin
+	 if(i == 0) begin
+	    gf_mult_intrm[i]	= gf_mult(poly[T_LEN],symb);
+	 end
+	 else
+	   gf_mult_intrm[i]	= gf_mult(xor_intrm[i-1], symb);	 
+	 xor_intrm[i]		= gf_mult_intrm[i] ^ poly[T_LEN-1-i];
+	 //$display("\ngf_mult_intrm[%0d] = 0x%0x", i, gf_mult_intrm[i]);
+	 //$display("xor_intrm[%0d]     = 0x%0x", i, xor_intrm[i]);
+      end
+      gf_poly_eval = xor_intrm[T_LEN-1];
+   endfunction // gf_inv
    
    //////////////////////////////////////   
    // Poly arithmetic
