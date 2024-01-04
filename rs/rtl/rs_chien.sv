@@ -7,7 +7,8 @@ module rs_chien
     input [SYMB_WIDTH-1:0] 	error_locator [T_LEN:0],
     input 			error_locator_vld,
     output logic [SYMB_NUM-2:0] error_positions ,
-    output 			error_positions_vld
+    output 			error_positions_vld,
+    output 			rs_chien_err
     );
    
    logic [SYMB_WIDTH-1:0] gf_elements [SYMB_NUM-2:0];
@@ -36,6 +37,19 @@ module rs_chien
 	error_locator_vld_q <= error_locator_vld;
    end
 
+   logic [$clog2($bits(error_positions_comb_q)+1)-1:0] count_pos;
+
+   /* verilator lint_off WIDTHEXPAND */   
+   always_comb begin
+      count_pos = '0;  
+      foreach(error_positions_comb_q[idx]) begin
+	 count_pos += !error_positions_comb_q[idx];
+      end
+   end
+   /* verilator lint_on WIDTHEXPAND */
+
+   assign rs_chien_err = (error_locator_vld_q) ? (count_pos > T_LEN) : 1'b0;
+   
    /////////////////////////
    // Output assignments
    /////////////////////////
