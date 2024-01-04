@@ -3,15 +3,14 @@ module lib_mux_ffs
     parameter PORTS_NUMBER = 4,
     parameter WIDTH = 8
     )
-  (
-   input [PORTS_NUMBER-1:0] base,
-   input [WIDTH-1:0] 	    data_i[PORTS_NUMBER-1:0],
-   input [PORTS_NUMBER-1:0] sel_non_ffs,
-   output [WIDTH-1:0] 	    data_o
+   (
+   input [PORTS_NUMBER-1:0]  base,
+   input [WIDTH-1:0] 	     data_i[PORTS_NUMBER-1:0],
+   input [PORTS_NUMBER-1:0]  sel_non_ffs,
+   output [WIDTH-1:0] 	     data_o,
+   output [PORTS_NUMBER-1:0] sel_ffs
    );
-
-   wire [PORTS_NUMBER-1:0]  sel_ffs;
-   	 
+   
    lib_ffs
      #(
        .WIDTH(PORTS_NUMBER)
@@ -34,5 +33,6 @@ module lib_mux_ffs
       .sel(sel_ffs),
       .data_o(data_o)
       );
+   
    
 endmodule // lib_mux_ffs
