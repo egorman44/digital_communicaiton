@@ -25,11 +25,12 @@ package gf_pkg;
    parameter POLY	= `POLY;
    parameter SYMB_NUM	= 2 ** SYMB_WIDTH;   
    parameter BUS_WIDTH_IN_SYMB = `BUS_WIDTH_IN_SYMB;
-   parameter FIRST_ROOT = 1;
+   parameter [SYMB_WIDTH-1:0] FIRST_ROOT = 1;
    parameter LEN_WIDTH = $clog2(T_LEN+1);
 
    typedef logic [SYMB_WIDTH-1:0] alpha_to_symb_t [SYMB_NUM-1:0];
-
+   typedef logic [SYMB_WIDTH-1:0] all_alpha_t [SYMB_NUM-2:0];
+   
    typedef logic [SYMB_WIDTH-1:0] alpha_t;
    typedef logic [SYMB_WIDTH-1:0] symb_t;
    typedef logic [SYMB_WIDTH-1:0] poly_t [T_LEN:0];
@@ -103,6 +104,36 @@ package gf_pkg;
    endfunction // gf_mult   
    
    //////////////////////////////////////   
+   // gf_pow is used in syndrome calculation
+   //////////////////////////////////////
+
+   function all_alpha_t gen_pow_first_root();
+      for(logic[SYMB_WIDTH-1:0] i = 0; i < N_LEN; ++i) begin
+	 gen_pow_first_root[i] = (FIRST_ROOT * i) % (SYMB_NUM-1);
+      end
+   endfunction // gf_pow
+
+   // TODO: check how this is synthesized in Vivado.   
+   function all_alpha_t gen_pow_first_root_neg();
+      for(logic[SYMB_WIDTH-1:0] i = 0; i < N_LEN; ++i) begin
+	 gen_pow_first_root_neg[i] = FIRST_ROOT*(SYMB_NUM-1-i) % (SYMB_NUM-1);
+      end
+   endfunction // gf_pow
+
+   // TODO: Do we need to substitute it with LUT table?!
+   function symb_t pow_first_root(symb_t power);
+      all_alpha_t pow_first_root_tbl;
+      pow_first_root_tbl	= gen_pow_first_root();
+      pow_first_root		= alpha_to_symb(pow_first_root_tbl[power]);      
+   endfunction // pow_first_root   
+
+   function symb_t pow_first_root_neg(symb_t power);
+      all_alpha_t pow_first_root_tbl;
+      pow_first_root_tbl	= gen_pow_first_root_neg();
+      pow_first_root_neg	= alpha_to_symb(pow_first_root_tbl[power]);
+   endfunction // pow_first_root   
+   
+   //////////////////////////////////////
    // gf_mult_power is used in syndrome calculation
    //////////////////////////////////////
 
@@ -124,6 +155,7 @@ package gf_pkg;
    // Inverse
    //////////////////////////////////////
 
+   // TODO: Do we need to substitute it with LUT table?!
    function symb_t gf_inv(symb_t symb);
       alpha_t alpha_inv;
       alpha_inv = SYMB_NUM - 1 - symb_to_alpha(symb);
