@@ -23,7 +23,8 @@ package gf_pkg;
    
    parameter SYMB_WIDTH = `SYMB_WIDTH;
    parameter POLY	= `POLY;
-   parameter SYMB_NUM	= 2 ** SYMB_WIDTH;   
+   parameter SYMB_NUM	= 2 ** SYMB_WIDTH;
+   parameter FIELD_CHARAC = SYMB_NUM - 1;
    parameter BUS_WIDTH_IN_SYMB = `BUS_WIDTH_IN_SYMB;
    parameter [SYMB_WIDTH-1:0] FIRST_ROOT = 1;
    parameter LEN_WIDTH = $clog2(T_LEN+1);
@@ -96,12 +97,29 @@ package gf_pkg;
       alpha_t alpha_a, alpha_b, alpha_sum;      
       alpha_a = symb_to_alpha(symb_a);
       alpha_b = symb_to_alpha(symb_b);
-      alpha_sum = (alpha_a + alpha_b) % (SYMB_NUM-1);
+      alpha_sum = (alpha_a + alpha_b) % FIELD_CHARAC;
       if((symb_a == 0) || (symb_b == 0))
 	gf_mult = 0;
       else
 	gf_mult = alpha_to_symb(alpha_sum);
    endfunction // gf_mult   
+
+   //////////////////////////////////////   
+   // gf_div
+   //
+   //////////////////////////////////////
+
+   function symb_t gf_div(symb_t dividend, symb_t divider);
+      // Check that divider != 0 outside the function
+      alpha_t alpha_dividend, alpha_divider, alpha_diff, alpha_diff_test;
+      alpha_dividend = symb_to_alpha(dividend);
+      alpha_divider = symb_to_alpha(divider);
+      alpha_diff = (alpha_dividend + FIELD_CHARAC - alpha_divider) % FIELD_CHARAC;
+      if(dividend == 0)
+	gf_div = 0;
+      else
+	gf_div = alpha_to_symb(alpha_diff);
+   endfunction // gf_div
    
    //////////////////////////////////////   
    // gf_pow is used in syndrome calculation
@@ -109,14 +127,20 @@ package gf_pkg;
 
    function all_alpha_t gen_pow_first_root();
       for(logic[SYMB_WIDTH-1:0] i = 0; i < N_LEN; ++i) begin
-	 gen_pow_first_root[i] = (FIRST_ROOT * i) % (SYMB_NUM-1);
+	 gen_pow_first_root[i] = (FIRST_ROOT * i) % FIELD_CHARAC;
+      end
+   endfunction // gf_pow
+
+   function all_alpha_t gen_pow_first_root_min1();
+      for(logic[SYMB_WIDTH-1:0] i = 0; i < N_LEN; ++i) begin
+	 gen_pow_first_root_min1[i] = ((FIRST_ROOT-1) * i) % FIELD_CHARAC;
       end
    endfunction // gf_pow
 
    // TODO: check how this is synthesized in Vivado.   
    function all_alpha_t gen_pow_first_root_neg();
       for(logic[SYMB_WIDTH-1:0] i = 0; i < N_LEN; ++i) begin
-	 gen_pow_first_root_neg[i] = FIRST_ROOT*(SYMB_NUM-1-i) % (SYMB_NUM-1);
+	 gen_pow_first_root_neg[i] = FIRST_ROOT*(FIELD_CHARAC-i) % FIELD_CHARAC;
       end
    endfunction // gf_pow
 
@@ -132,6 +156,12 @@ package gf_pkg;
       pow_first_root_tbl	= gen_pow_first_root_neg();
       pow_first_root_neg	= alpha_to_symb(pow_first_root_tbl[power]);
    endfunction // pow_first_root   
+
+   function symb_t pow_first_root_min1(symb_t power);
+      all_alpha_t pow_first_root_tbl;
+      pow_first_root_tbl	= gen_pow_first_root_min1();
+      pow_first_root_min1	= alpha_to_symb(pow_first_root_tbl[power]);
+   endfunction // pow_first_root_min1
    
    //////////////////////////////////////
    // gf_mult_power is used in syndrome calculation
@@ -143,8 +173,8 @@ package gf_pkg;
       alpha_a = symb_to_alpha(symb_a);
       alpha_x = symb_to_alpha(root);
       // TODO: check more efficient way of mult in GF
-      alpha_x_power = (alpha_x * power_x) % (SYMB_NUM-1);
-      alpha_sum = (alpha_a + alpha_x) % (SYMB_NUM-1);
+      alpha_x_power = (alpha_x * power_x) % FIELD_CHARAC;
+      alpha_sum = (alpha_a + alpha_x) % FIELD_CHARAC;
       if((symb_a == 0) || (root == 0))
 	gf_mult_power = 0;
       else
