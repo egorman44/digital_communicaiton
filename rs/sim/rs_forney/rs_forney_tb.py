@@ -71,12 +71,14 @@ T_LEN = math.floor(ROOTS_NUM/2)
 
 @cocotb.test()
 async def rs_syndrome_test(dut):
-    init_tables()
 
-    # System signals
+    ###################################################
+    # Conenct TB to DUT ports
+    ###################################################
+    
     aclk    = dut.aclk
     aresetn = dut.aresetn
-    #
+    
     s_if0 = AxisIf(aclk=aclk,
                    tdata=dut.error_positions_tdata,
                    tvalid=dut.error_positions_tvalid,
@@ -87,6 +89,7 @@ async def rs_syndrome_test(dut):
     s_if1 = AxisIf(aclk=aclk,
                    tdata=dut.syndrome,
                    tvalid=dut.syndrome_vld,
+                   tlast=dut.syndrome_vld,
                    width=ROOTS_NUM)
     
     m_if = AxisIf(aclk=aclk,
@@ -101,28 +104,26 @@ async def rs_syndrome_test(dut):
     ###################################################
     
     pkt_comp  = Comparator('FORNEY comparator')
-    s_drv0     = AxisDriver('drv__err_pos', s_if0, T_LEN, 1)
-    s_drv1     = AxisDriver('drv__syndr'  , s_if1, ROOTS_NUM, 1)
-    port_in0 = []
-    port_in1 = []
+    s_drv0    = AxisDriver('drv__err_pos', s_if0, T_LEN, 1)
+    s_drv1    = AxisDriver('drv__syndr'  , s_if1, ROOTS_NUM, 1)
+    port_in0  = []
+    port_in1  = []
     predictor = ErrValuePredictor('err_val_prd', pkt_comp.port_prd, ROOTS_NUM, N_LEN)
     s_mon0    = AxisMonitor('s_mon0', s_if0, port_in0, T_LEN, 1)
     s_mon1    = AxisMonitor('s_mon1', s_if1, port_in1, T_LEN, 1)
-    m_mon     = AxisMonitor('m_mon', m_if, pkt_comp.port_out, T_LEN, 1)    
-
+    m_mon     = AxisMonitor('m_mon', m_if, pkt_comp.port_out, T_LEN, 1)
+    
     ###################################################
     # Stimulus generation
     ###################################################
     
-    # reference message:
     init_tables()
     
+    corrupt_words_num = random.randint(1, T_LEN)
+
     ref_msg = Packet(name='ref_msg', word_size=BUS_WIDTH_IN_SYMB)
     ref_msg.generate(K_LEN)
     ref_msg.print_pkt("ORIGIN_MSG")
-    
-    corrupt_words_num = random.randint(1, T_LEN)
-    #corrupt_words_num = 8
     
     enc_msg = RsPacket(name='enc_msg', n_len=N_LEN, roots_num=ROOTS_NUM, word_size=BUS_WIDTH_IN_SYMB, corrupt_words_num=0)
     enc_msg.generate(ref_pkt=ref_msg)
@@ -131,29 +132,34 @@ async def rs_syndrome_test(dut):
     cor_msg = RsPacket(name='cor_msg', n_len=N_LEN, roots_num=ROOTS_NUM, word_size=BUS_WIDTH_IN_SYMB, corrupt_words_num=corrupt_words_num)
     cor_msg.generate(ref_pkt=ref_msg)
     cor_msg.print_pkt("CORRUPT_MSG")
-    cor_msg.compare(enc_msg)
-    predictor.port_in.append(cor_msg)
     
     out_msg = RsDecodedPacket(name='out_msg', n_len=N_LEN, roots_num=ROOTS_NUM, word_size=BUS_WIDTH_IN_SYMB, corrupt_words_num=corrupt_words_num)
     out_msg.generate(ref_pkt=cor_msg)
     out_msg.print_pkt("OUT_MSG")
     
-    ref_msg.compare(out_msg, 1)
     err_pos = RsErrPositionPacket(name='err_pos_msg', n_len=N_LEN, roots_num=ROOTS_NUM, word_size=BUS_WIDTH_IN_SYMB)
     err_pos.generate(ref_pkt=cor_msg)
     err_pos.print_pkt()
-
+    
     synd_pkt = RsSyndromePacket(name='synd_pkt', n_len=N_LEN, roots_num=ROOTS_NUM, word_size=BUS_WIDTH_IN_SYMB)
     synd_pkt.generate(ref_pkt=cor_msg)
     synd_pkt.print_pkt()
 
-    ## START TEST
+    cor_msg.compare(enc_msg)
+    ref_msg.compare(out_msg, 1)
+    
+    predictor.port_in.append(cor_msg)
+    
+    ###################################################
+    # START TEST
+    ###################################################
+    
     await cocotb.start(reset_dut(aresetn,100))
     await Timer(50, units = "ns")
     
     await cocotb.start(custom_clock(aclk))
-    #await cocotb.start(s_mon0.mon_if())
-    #await cocotb.start(s_mon1.mon_if())
+    await cocotb.start(s_mon0.mon_if())
+    await cocotb.start(s_mon1.mon_if())
     await cocotb.start(m_mon.mon_if())
     
     await RisingEdge(aresetn)

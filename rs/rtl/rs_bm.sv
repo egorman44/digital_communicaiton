@@ -93,11 +93,15 @@ module rs_bm
       
       ////////////////////////////////////
       // Iterations started
-      ////////////////////////////////////      
+      ////////////////////////////////////
+
+      // TODO: check utilization ?!
+      
       for(int i = 1; i < ROOTS_NUM + 1; ++i) begin
 	 // Sum upper limit is L(r-1), then syndrome_inv should be ANDed
 	 // with error_locator_len_vld to discard redundent items in error_locator[i-1]
 	 // TODO: delta[1] = syndr[0]
+	 // TODO: is it poly muly ?! Check forney there is also polymult.
 	 delta_intrm[i]	= gf_poly_mult(syndrome_inv_vld[i-1], error_locator_intrm[i-1]);
 	 delta[i]	= gf_poly_sum(delta_intrm[i]);
 	 delta_inv[i]	= gf_inv(delta[i]);

@@ -50,7 +50,7 @@ module rs_forney
    // TODO: reduce POLY, since in the [0] position always 1.
    always_comb begin
       // pow_first_root is used to get all cores of generator       
-      // TODO: check that is synthesized in the static wires. 
+      // TODO: check that it is synthesized in the static wires. 
       for(int pos_indx = 0; pos_indx < T_LEN; ++pos_indx) begin
       	 coef_position_pow[pos_indx] = pow_first_root(coef_position[pos_indx]);
 	 // GF polynimial multiplication:
@@ -68,7 +68,7 @@ module rs_forney
 		err_loc_mux_in[pos_indx][symb_indx] = gf_mult(err_loc_mux_in[pos_indx-1][symb_indx-1], coef_position_pow[pos_indx]);
 	      else
       		err_loc_mux_in[pos_indx][symb_indx] = err_loc_mux_in[pos_indx-1][symb_indx] ^ gf_mult(err_loc_mux_in[pos_indx-1][symb_indx-1], coef_position_pow[pos_indx]);
-      	 end // else: !if(pos_indx == 0)	 
+      	 end // else: !if(pos_indx == 0)
       end // for (int pos_indx = 0; pos_indx < T_LEN; ++pos_indx)
    end // always_comb
    

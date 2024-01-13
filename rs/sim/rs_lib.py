@@ -194,13 +194,11 @@ class ErrValuePredictor(Predictor):
     def predict(self):
         t_len = math.floor(self.roots_num/2) + 1
         for pkt in self.port_in:
-            pkt.print_pkt("PREDICTOR")
             err_val_pkt = RsErrValuePacket(name=self.name,
                                            n_len=self.n_len,
                                            roots_num=self.roots_num,
                                            word_size = pkt.word_size)
             err_val_pkt.generate(ref_pkt=pkt)
-            err_val_pkt.print_pkt("PREDICTOR")
             self.port_prd.append(err_val_pkt)
 
 
