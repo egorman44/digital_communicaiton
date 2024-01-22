@@ -15,6 +15,10 @@ package gf_pkg;
 `ifndef BUS_WIDTH_IN_SYMB
  `define BUS_WIDTH_IN_SYMB 4
 `endif
+
+`ifndef ROOTS_PER_CYCLE
+ `define ROOTS_PER_CYCLE (2 ** SYMB_WIDTH)-1
+`endif
    
    parameter N_LEN	= `N_LEN;
    parameter K_LEN	= `K_LEN;
@@ -29,6 +33,14 @@ package gf_pkg;
    parameter [SYMB_WIDTH-1:0] FIRST_ROOT = 1;
    parameter LEN_WIDTH = $clog2(T_LEN+1);
 
+   //////////////////////////////////////
+   // Parameterized Chien search
+   //////////////////////////////////////
+   
+   parameter ROOTS_PER_CYCLE = `ROOTS_PER_CYCLE;
+   parameter CYCLES_NUM__CHIEN = SYMB_NUM / ROOTS_PER_CYCLE;
+   parameter CNTR_WIDTH__CHIEN = $clog2(CYCLES_NUM__CHIEN);
+   
    typedef logic [SYMB_WIDTH-1:0] alpha_to_symb_t [SYMB_NUM-1:0];
    typedef logic [SYMB_WIDTH-1:0] all_alpha_t [SYMB_NUM-2:0];
    
@@ -198,18 +210,16 @@ package gf_pkg;
 
    function symb_t gf_poly_eval(poly_t poly, symb_t symb);
       logic [SYMB_WIDTH-1:0] gf_mult_intrm[T_LEN-1:0];
+      /* verilator lint_off UNOPTFLAT */
       logic [SYMB_WIDTH-1:0] xor_intrm[T_LEN-1:0];
-      //$display("*** GF_POLY_EVAL***");
-      
+      /* verilator lint_on UNOPTFLAT */
       for(int i = 0; i < T_LEN; ++i) begin
 	 if(i == 0) begin
 	    gf_mult_intrm[i]	= gf_mult(poly[T_LEN],symb);
 	 end
 	 else
-	   gf_mult_intrm[i]	= gf_mult(xor_intrm[i-1], symb);	 
+	   gf_mult_intrm[i]	= gf_mult(xor_intrm[i-1], symb);
 	 xor_intrm[i]		= gf_mult_intrm[i] ^ poly[T_LEN-1-i];
-	 //$display("\ngf_mult_intrm[%0d] = 0x%0x", i, gf_mult_intrm[i]);
-	 //$display("xor_intrm[%0d]     = 0x%0x", i, xor_intrm[i]);
       end
       gf_poly_eval = xor_intrm[T_LEN-1];
    endfunction // gf_inv
