@@ -12,7 +12,9 @@ module lib_mux_onehot
    logic [WIDTH-1:0]         data_and_sel[PORTS_NUMBER-1:0];
 
    // Intermediate ORs
-   logic [WIDTH-1:0]         ors_intr[PORTS_NUMBER-1:1];
+   /* verilator lint_off UNOPTFLAT */
+   logic [WIDTH-1:0] 	     ors_intr[PORTS_NUMBER-1:1];
+   /* verilator lint_on UNOPTFLAT */
 
    always_comb begin
       foreach(data_and_sel[i])

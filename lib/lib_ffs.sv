@@ -16,24 +16,32 @@ module lib_ffs
    (
     input [WIDTH-1:0] 	     vect,
     input [WIDTH-1:0] 	     base,
+    /* verilator lint_off UNOPTFLAT */
     output logic [WIDTH-1:0] vect_ffs
+    /* verilator lint_on UNOPTFLAT */
     );
    
    logic [WIDTH-1:0] 	     vect_inrm;
    logic [WIDTH*2-1:0] 	     in_2x;
    logic [WIDTH*2-1:0] 	     out_2x;
+   /* verilator lint_off UNOPTFLAT */
    logic [WIDTH-1:0] 	     vect_ffs_inrm;
+   /* verilator lint_on UNOPTFLAT */
 
-   // Swap vetors is MSB -> LSB search
+
+   //////////////////////////////////////
+   // Swap input/output vectors if MSB -> LSB search
+   //////////////////////////////////////
+   
    always_comb begin
-      if(LSB_MSB) begin
+      if(LSB_MSB != 0) begin
 	 vect_inrm	= vect;
 	 vect_ffs	= vect_ffs_inrm;
       end
       else begin
 	 for(int i = 0; i < WIDTH; ++i) begin
 	    vect_inrm[i]	= vect[WIDTH-1-i];
-	    vect_ffs[i]	= vect_ffs_inrm[WIDTH-1-i];
+	    vect_ffs[i]		= vect_ffs_inrm[WIDTH-1-i];
 	 end	  
       end
    end // always_comb

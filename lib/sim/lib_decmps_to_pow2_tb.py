@@ -32,7 +32,8 @@ from coco_axis.axis import AxisResponder
 from coco_axis.axis import AxisMonitor
 from coco_axis.axis import AxisIf
 
-WIDTH = 12
+WIDTH = 255
+FFS_NUM = 9
 LSB_MSB = 1
 
 @cocotb.test()
@@ -78,8 +79,9 @@ def lib_decmps_to_pow2_tb():
 
     # Parameters    
     parameters = {
-        "WIDTH" : WIDTH,
-        "LSB_MSB" : LSB_MSB
+        "WIDTH"   : WIDTH,
+        "LSB_MSB" : LSB_MSB,
+        "FFS_NUM" : FFS_NUM
                   }
     
     # Defines    
