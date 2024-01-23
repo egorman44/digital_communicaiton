@@ -13,7 +13,7 @@ module rs_chien_param
 
    logic [SYMB_WIDTH-1:0]   roots[ROOTS_PER_CYCLE-1:0];
    logic [SYMB_WIDTH-1:0]   roots_mux_in[ROOTS_PER_CYCLE-1:0];
-   
+   logic 		    eval_position;
    /////////////////////////////////////////////////
    // Parameterize chien search to optimize utilization
    /////////////////////////////////////////////////
@@ -51,6 +51,7 @@ module rs_chien_param
    end // block: MULTICYCLE_CHIEN   
    else if(CYCLES_NUM__CHIEN == 1) begin : SINGLE_CYCLE
 
+      logic error_locator_vld_q;
       // Iterate over alpha^0 upto aplha^(2^m-2)
       always_comb begin
 	 for(int i = 0; i < ROOTS_PER_CYCLE; ++i) begin
@@ -58,6 +59,11 @@ module rs_chien_param
 	    roots_mux_in[i] = i[SYMB_WIDTH-1:0];
 	 end	 
       end
+
+      always_ff @(posedge aclk)
+	error_locator_vld_q <= error_locator_vld;
+   
+      assign eval_position = error_locator_vld_q;
    
    end
    else begin : CONFIG_ERROR
@@ -139,10 +145,10 @@ module rs_chien_param
 	 if(error_locator_vld)begin
 	    for(int i = 0; i < T_LEN; ++i) begin
 	       error_positions_q[i] <= '0;
-	       error_positions_vld_q <= '0;
+	       error_positions_vld_q[i] <= '0;
 	    end
 	 end
-	 else begin
+	 else if(eval_position) begin
 	    for(int i = 0; i < T_LEN; ++i) begin
 	       if(|mux_sel[i])
 		 error_positions_vld_q[i] <= |mux_sel[i];

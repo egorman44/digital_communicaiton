@@ -59,7 +59,8 @@ module lib_decmps_to_pow2
 	   ffs_vect_in[i] = onehot_xor[i] ^ vect;
       end
    end
-   
+
+   wire [WIDTH-1:0] base = { {WIDTH-1{1'b0}}, 1'b1 };
    for(genvar i = 0; i < FFS_NUM; ++i) begin : FFS_GEN
 
       lib_ffs
@@ -70,7 +71,7 @@ module lib_decmps_to_pow2
       lib_ffs_inst
 		  (
 		   .vect(ffs_vect_in[i]),
-		   .base(1),
+		   .base(base),
 		   .vect_ffs(ffs_vect_out[i])
 		   );
 

@@ -24,6 +24,7 @@ module gf_poly_eval
       end
    end // always_comb
 
+   wire [T_LEN-1:0] base = { {T_LEN-1{1'b0}}, 1'b1};   
    lib_mux_ffs
      #(
        .PORTS_NUMBER(T_LEN),
@@ -31,7 +32,7 @@ module gf_poly_eval
        )
    lib_mux_ffs_inst
      (
-      .base(1),
+      .base(base),
       .data_i(xor_intrm),
       .sel_non_ffs(poly_vld),
       .data_o(eval_value),
