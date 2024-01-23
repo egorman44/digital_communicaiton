@@ -21,7 +21,12 @@ module rs_chien
    always_comb begin
       for(int i = 0; i < ROOTS_PER_CYCLE; ++i) begin
    	 error_bit_pos_comb[i]	= (|error_locator_roots[i]);
-   	 error_bit_pos[ROOTS_PER_CYCLE-1-i] = ~error_bit_pos_comb[i]; // Revert position
+	 // If a single cycle chien search then revert ERROR BIT order,
+	 // if a multicycled then revert ROOTS in the rs_chien_param
+	 if(CYCLES_NUM__CHIEN == 1)
+   	   error_bit_pos[ROOTS_PER_CYCLE-1-i] = ~error_bit_pos_comb[i]; // Revert position
+	 else
+	   error_bit_pos[i] = ~error_bit_pos_comb[i]; // Revert position
       end
    end // always_comb
 

@@ -17,7 +17,9 @@ package gf_pkg;
 `endif
 
 `ifndef ROOTS_PER_CYCLE
- `define ROOTS_PER_CYCLE (2 ** SYMB_WIDTH)-1
+   // TODO: What is the ROOTS_PER_CYCLE 
+// `define ROOTS_PER_CYCLE (2 ** SYMB_WIDTH)-2
+ `define ROOTS_PER_CYCLE 32
 `endif
    
    parameter N_LEN	= `N_LEN;
@@ -38,8 +40,13 @@ package gf_pkg;
    //////////////////////////////////////
    
    parameter ROOTS_PER_CYCLE = `ROOTS_PER_CYCLE;
-   parameter CYCLES_NUM__CHIEN = SYMB_NUM / ROOTS_PER_CYCLE;
+   parameter ROOTS_NUM__CHIEN = SYMB_NUM - 2;
+   parameter CYCLES_NUM__CHIEN = (ROOTS_NUM__CHIEN % ROOTS_PER_CYCLE) ? ((ROOTS_NUM__CHIEN / ROOTS_PER_CYCLE) + 1) : (ROOTS_NUM__CHIEN/ROOTS_PER_CYCLE);
    parameter CNTR_WIDTH__CHIEN = $clog2(CYCLES_NUM__CHIEN);
+
+   //////////////////////////////////////
+   // Typedefs
+   //////////////////////////////////////
    
    typedef logic [SYMB_WIDTH-1:0] alpha_to_symb_t [SYMB_NUM-1:0];
    typedef logic [SYMB_WIDTH-1:0] all_alpha_t [SYMB_NUM-2:0];

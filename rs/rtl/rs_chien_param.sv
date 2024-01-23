@@ -11,42 +11,65 @@ module rs_chien_param
     output 		    rs_chien_err
     );
 
+   // TODO: check CYCLES_NUM__CHIEN
+
+   initial begin
+      $display("CYCLES_NUM__CHIEN = %0d, CNTR_WIDTH__CHIEN = %0d", CYCLES_NUM__CHIEN, CNTR_WIDTH__CHIEN);
+   end
+   
    logic [SYMB_WIDTH-1:0]   roots[ROOTS_PER_CYCLE-1:0];
    logic [SYMB_WIDTH-1:0]   roots_mux_in[ROOTS_PER_CYCLE-1:0];
    logic 		    eval_position;
+   
    /////////////////////////////////////////////////
    // Parameterize chien search to optimize utilization
    /////////////////////////////////////////////////
    
    if(CYCLES_NUM__CHIEN > 1) begin : MULTICYCLE_CHIEN
 
-      logic [SYMB_WIDTH-1:0] roots_q[ROOTS_PER_CYCLE-2:0];
       logic [SYMB_WIDTH-1:0] chien_st_cntr_q;         
-      logic [SYMB_WIDTH-1:0] base_roots[ROOTS_PER_CYCLE-1:0];
+      logic [SYMB_WIDTH-1:0] base_i[ROOTS_PER_CYCLE-1:0];
+      logic [SYMB_WIDTH-1:0] current_i[ROOTS_PER_CYCLE-1:0];
+      logic [SYMB_WIDTH-1:0] base_i_q[ROOTS_PER_CYCLE-1:0];
       wire 		     last_cycle = (chien_st_cntr_q == SYMB_WIDTH'(CYCLES_NUM__CHIEN-1));
+      wire [SYMB_WIDTH-1:0]  base [SYMB_WIDTH-1:0];
 
+      for(genvar i =0; i < CYCLES_NUM__CHIEN; ++i) begin
+	 assign base[i] = i * ROOTS_PER_CYCLE;
+      end
+      
       always_ff @(posedge aclk, negedge aresetn) begin
 	 if(~aresetn) begin
 	    chien_st_cntr_q <= '0;
 	 end
 	 else begin
-	    if(last_cycle)
-	      chien_st_cntr_q <= '0;
-	    else if(error_locator_vld)
+	    if(error_locator_vld)
 	      chien_st_cntr_q <= chien_st_cntr_q + 1;
+	    else if(|chien_st_cntr_q) begin
+	       if(last_cycle)
+		 chien_st_cntr_q <= '0;
+	       else
+		 chien_st_cntr_q <= chien_st_cntr_q + 1'b1;
+	    end
 	 end
-      end
+      end // always_ff @ (posedge aclk, negedge aresetn)
    
+   // TODO: chech the limit in for , shouldn't it be ROOTS_PER_CYCLE-1
        always_comb begin
-         for(int i = 0; i < ROOTS_PER_CYCLE-1; ++i) begin
-   	    base_roots[i] = i[SYMB_WIDTH-1:0];
-   	    roots[i] = base_roots[i] + chien_st_cntr_q;
+         for(int i = 0; i < ROOTS_PER_CYCLE; ++i) begin
+   	    base_i[i] = i[SYMB_WIDTH-1:0];
+	    current_i[i] = base_i[i] + base[chien_st_cntr_q];
+   	    roots[i] = alpha_to_symb(current_i[i]);
          end      
        end
 
        always_ff @(posedge aclk) begin
-	  roots_q <= roots;
+	  for(int i=0; i<ROOTS_PER_CYCLE; ++i)
+	    base_i_q[i] <= SYMB_NUM-2-current_i[i];
        end
+
+       assign roots_mux_in = base_i_q;
+       assign eval_position = |chien_st_cntr_q;   
 
    end // block: MULTICYCLE_CHIEN   
    else if(CYCLES_NUM__CHIEN == 1) begin : SINGLE_CYCLE
@@ -104,7 +127,7 @@ module rs_chien_param
    
    lib_decmps_to_pow2
      #(
-       .WIDTH(SYMB_NUM-1),
+       .WIDTH(ROOTS_PER_CYCLE),
        .FFS_NUM(T_LEN)
        )
    lib_decmps_to_pow2
