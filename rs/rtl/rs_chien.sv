@@ -1,15 +1,15 @@
 module rs_chien
   import gf_pkg::*;
    (
-    input [SYMB_WIDTH-1:0] 	       roots[ROOTS_PER_CYCLE-1:0],
+    input [SYMB_WIDTH-1:0] 	       roots[ROOTS_PER_CYCLE__CHIEN-1:0],
     input [SYMB_WIDTH-1:0] 	       error_locator [T_LEN:0],
-    output logic [ROOTS_PER_CYCLE-1:0] error_bit_pos
+    output logic [ROOTS_PER_CYCLE__CHIEN-1:0] error_bit_pos
     );
    
-   wire [SYMB_WIDTH-1:0] error_locator_roots [ROOTS_PER_CYCLE-1:0];
-   logic [ROOTS_PER_CYCLE-1:0] error_bit_pos_comb;   
+   wire [SYMB_WIDTH-1:0] error_locator_roots [ROOTS_PER_CYCLE__CHIEN-1:0];
+   logic [ROOTS_PER_CYCLE__CHIEN-1:0] error_bit_pos_comb;   
 
-   for(genvar i = 0; i < ROOTS_PER_CYCLE; ++i) begin : GF_POLY_EVAL
+   for(genvar i = 0; i < ROOTS_PER_CYCLE__CHIEN; ++i) begin : GF_POLY_EVAL
       gf_poly_eval gf_poly_eval_inst
 		  (
 		   .poly(error_locator),
@@ -19,7 +19,7 @@ module rs_chien
    end
       
    always_comb begin
-      for(int i = 0; i < ROOTS_PER_CYCLE; ++i) begin
+      for(int i = 0; i < ROOTS_PER_CYCLE__CHIEN; ++i) begin
    	 error_bit_pos_comb[i]	= (|error_locator_roots[i]);
 	 error_bit_pos[i] = ~error_bit_pos_comb[i]; // Revert position
       end

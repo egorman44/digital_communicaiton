@@ -16,10 +16,10 @@ package gf_pkg;
  `define BUS_WIDTH_IN_SYMB 4
 `endif
 
-`ifndef ROOTS_PER_CYCLE
-   // TODO: What is the ROOTS_PER_CYCLE 
-// `define ROOTS_PER_CYCLE (2 ** SYMB_WIDTH)-2
- `define ROOTS_PER_CYCLE 32
+`ifndef ROOTS_PER_CYCLE__CHIEN
+   // TODO: What is the ROOTS_PER_CYCLE__CHIEN 
+   `define ROOTS_PER_CYCLE__CHIEN (2 ** SYMB_WIDTH)-2
+ //`define ROOTS_PER_CYCLE__CHIEN 2
 `endif
    
    parameter N_LEN	= `N_LEN;
@@ -37,11 +37,14 @@ package gf_pkg;
 
    //////////////////////////////////////
    // Parameterized Chien search
+   //
+   // NON_VALID__CHIEN - shows which bits of error position vector is not valid.
    //////////////////////////////////////
    
-   parameter ROOTS_PER_CYCLE = `ROOTS_PER_CYCLE;
+   parameter ROOTS_PER_CYCLE__CHIEN = `ROOTS_PER_CYCLE__CHIEN;
    parameter ROOTS_NUM__CHIEN = SYMB_NUM - 2;
-   parameter CYCLES_NUM__CHIEN = (ROOTS_NUM__CHIEN % ROOTS_PER_CYCLE) ? ((ROOTS_NUM__CHIEN / ROOTS_PER_CYCLE) + 1) : (ROOTS_NUM__CHIEN/ROOTS_PER_CYCLE);
+   parameter NON_VALID__CHIEN = ROOTS_NUM__CHIEN % ROOTS_PER_CYCLE__CHIEN; 
+   parameter CYCLES_NUM__CHIEN = (NON_VALID__CHIEN != 0) ? ((ROOTS_NUM__CHIEN / ROOTS_PER_CYCLE__CHIEN) + 1) : (ROOTS_NUM__CHIEN/ROOTS_PER_CYCLE__CHIEN);   
    parameter CNTR_WIDTH__CHIEN = $clog2(CYCLES_NUM__CHIEN);
 
    //////////////////////////////////////
