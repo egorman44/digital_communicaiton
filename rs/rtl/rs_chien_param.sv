@@ -12,6 +12,7 @@ module rs_chien_param
     );
    
    logic [SYMB_WIDTH-1:0]   roots[ROOTS_PER_CYCLE__CHIEN-1:0];
+   wire 		    roots_vld;
    logic [SYMB_WIDTH-1:0]   alpha_mux_in[ROOTS_PER_CYCLE__CHIEN-1:0];
 
    wire 		    gf_poly_vld[ROOTS_PER_CYCLE__CHIEN-1:0];
@@ -26,7 +27,7 @@ module rs_chien_param
 
    // TODO: check that nonvalid poly is always zero.
    always_comb begin
-      for(int i =0; i < T_LEN-1; ++i) 
+      for(int i=0; i < T_LEN; ++i) 
 	poly_sel[i] = |error_locator[T_LEN-1-i];
    end
    
@@ -43,25 +44,40 @@ module rs_chien_param
 	 /*AUTOINST*/
 	 // Outputs
 	 .roots				(roots/*[SYMB_WIDTH-1:0].[ROOTS_PER_CYCLE__CHIEN-1:0]*/),
+	 .roots_vld			(roots_vld),
 	 // Inputs
 	 .aclk				(aclk),
 	 .aresetn			(aresetn));
 
-      wire gf_poly_vld_pulse;         
-      assign gf_poly_vld_pulse = ~gf_poly_vld_q && gf_poly_vld[0];
-
+      wire gf_poly_vld_pos = ~gf_poly_vld_q && gf_poly_vld[0];
+      wire gf_poly_vld_neg = gf_poly_vld_q && ~gf_poly_vld[0];      
+      logic gf_poly_vld_pos_q, gf_poly_vld_neg_q;
       
+      always_ff @(posedge aclk, negedge aresetn) begin
+	 if(~aresetn) begin
+	    gf_poly_vld_pos_q <= 1'b0;
+	    gf_poly_vld_neg_q <= 1'b0;
+	 end
+	 else begin
+	    gf_poly_vld_pos_q <= gf_poly_vld_pos;
+	    gf_poly_vld_neg_q <= gf_poly_vld_neg;
+	 end
+      end
+
+      assign error_positions_vld = gf_poly_vld_neg_q;
+
       rs_chien_root_gen bit_pos_roots_inst
 	(
 	 .alpha_current			(alpha_mux_in),
 	 .roots	          		(),
-	 .vld	   			(gf_poly_vld_pulse),
+	 .vld	   			(gf_poly_vld_pos_q),
+	 .roots_vld			(),
 	 /*AUTOINST*/
 	 // Outputs	 
 	 // Inputs
 	 .aclk				(aclk),
 	 .aresetn			(aresetn));
-      
+   
    end // block: MULTICYCLE_CHIEN
 
    /////////////////////////////////////////////////
@@ -69,7 +85,18 @@ module rs_chien_param
    /////////////////////////////////////////////////
    
    else if(CYCLES_NUM__CHIEN == 1) begin : SINGLE_CYCLE
-      
+
+      logic gf_poly_vld_qq;
+
+      always_ff @(posedge aclk , negedge aresetn) begin
+	 if(~aresetn)
+	   gf_poly_vld_qq <= 1'b0;
+	 else
+	   gf_poly_vld_qq <= gf_poly_vld_q;
+      end
+   
+      assign roots_vld = error_locator_vld;
+      assign error_positions_vld = gf_poly_vld_qq;
       // Iterate over alpha^0 upto aplha^(2^m-2)
       always_comb begin
 	 for(int i = 0; i < ROOTS_PER_CYCLE__CHIEN; ++i) begin
@@ -105,7 +132,7 @@ module rs_chien_param
 		  (
 		   .aclk(aclk),
 		   .aresetn(aresetn),
-		   .vld_i(error_locator_vld),
+		   .vld_i(roots_vld),
 		   .poly(error_locator),
 		   .poly_sel(poly_sel),
 		   .symb(roots[i]),
@@ -131,7 +158,7 @@ module rs_chien_param
    end // always_comb
    
    always_ff @(posedge aclk) begin
-      if(gf_poly_vld)
+      if(gf_poly_vld[0])
 	error_bit_pos_q <= error_bit_pos;
       else
 	// Clear positions for bit position converter if not used
@@ -143,9 +170,9 @@ module rs_chien_param
    /////////////////////////////////////////////////
    
    logic [SYMB_WIDTH-1:0] error_positions_q[T_LEN-1:0];
-   logic [T_LEN-1:0] 	  error_positions_vld_q;
+   logic [T_LEN-1:0] 	  err_pos_capt_q;
    wire [ROOTS_PER_CYCLE__CHIEN-1:0] mux_sel[T_LEN-1:0];
-   wire [T_LEN-1:0] 	  bypass = error_positions_vld_q;   
+   wire [T_LEN-1:0] 	  bypass = err_pos_capt_q;   
    wire [SYMB_WIDTH-1:0]  error_positions_mux_out[T_LEN-1:0];
    
    lib_decmps_to_pow2
@@ -154,7 +181,7 @@ module rs_chien_param
        .FFS_NUM(T_LEN),
        .LSB_MSB(1)
        )
-   lib_decmps_to_pow2
+   lib_decmps_to_pow2_inst
      (
       .vect(error_bit_pos_q),
       .bypass(bypass),
@@ -185,22 +212,22 @@ module rs_chien_param
       if(~aresetn) begin
 	 for(int i = 0; i < T_LEN; ++i) begin
 	    error_positions_q[i] <= '0;
-	    error_positions_vld_q[i] <= '0;
+	    err_pos_capt_q[i] <= '0;
 	 end
       end
       else begin	 
 	 if(gf_poly_vld_q) begin
 	    for(int i = 0; i < T_LEN; ++i) begin
 	       if(|mux_sel[i])
-		 error_positions_vld_q[i] <= |mux_sel[i];
-	       if(|mux_sel[i] && !error_positions_vld_q[i])
+		 err_pos_capt_q[i] <= |mux_sel[i];
+	       if(|mux_sel[i] && !err_pos_capt_q[i])
 		 error_positions_q[i] <= SYMB_NUM-2-error_positions_mux_out[i];	       
 	    end
 	 end	
 	 else begin
 	    for(int i = 0; i < T_LEN; ++i) begin
 	       error_positions_q[i] <= '0;
-	       error_positions_vld_q[i] <= '0;
+	       err_pos_capt_q[i] <= '0;
 	    end
 	 end
       end // else: !if(~aresetn)      
@@ -249,6 +276,6 @@ module rs_chien_param
    end
 
    assign error_positions = error_positions_q;
-   assign rs_chien_err = (error_positions_vld) ? (count_pos_q > T_LEN) : 1'b0;
+   assign rs_chien_err = (err_pos_capt_q) ? (count_pos_q > T_LEN) : 1'b0;
 
 endmodule // rs_chien_param
