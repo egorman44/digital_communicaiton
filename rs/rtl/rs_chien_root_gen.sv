@@ -3,9 +3,10 @@ module rs_chien_root_gen
   (
    input 			 aclk, 
    input 			 aresetn,
-   input 			 vld,   
+   input 			 vld, 
    output logic [SYMB_WIDTH-1:0] alpha_current[ROOTS_PER_CYCLE__CHIEN-1:0],
-   output logic [SYMB_WIDTH-1:0] roots[ROOTS_PER_CYCLE__CHIEN-1:0]
+   output logic [SYMB_WIDTH-1:0] roots[ROOTS_PER_CYCLE__CHIEN-1:0],
+   output 			 roots_vld
    );
 
    logic [SYMB_WIDTH-1:0] chien_st_cntr_q;         
@@ -44,5 +45,7 @@ module rs_chien_root_gen
    	 roots[i]		= alpha_to_symb(alpha_current[i]);
       end      
    end
+
+   assign roots_vld = vld || |chien_st_cntr_q;
 
 endmodule // rs_chien_root_gen
