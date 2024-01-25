@@ -18,9 +18,13 @@ package gf_pkg;
 
 `ifndef ROOTS_PER_CYCLE__CHIEN
    // TODO: What is the ROOTS_PER_CYCLE__CHIEN 
-   `define ROOTS_PER_CYCLE__CHIEN (2 ** SYMB_WIDTH)-2
+ `define ROOTS_PER_CYCLE__CHIEN (2 ** SYMB_WIDTH)-2
  //`define ROOTS_PER_CYCLE__CHIEN 2
 `endif
+
+   //////////////////////////////////////
+   // Reed Solomon parameters
+   //////////////////////////////////////
    
    parameter N_LEN	= `N_LEN;
    parameter K_LEN	= `K_LEN;
@@ -48,7 +52,8 @@ package gf_pkg;
    parameter CYCLES_NUM__CHIEN = (NON_VALID__CHIEN != 0) ? ((ROOTS_NUM__CHIEN / ROOTS_PER_CYCLE__CHIEN) + 1) : (ROOTS_NUM__CHIEN/ROOTS_PER_CYCLE__CHIEN);   
    parameter CNTR_WIDTH__CHIEN = $clog2(CYCLES_NUM__CHIEN);
    
-   parameter FF_STEP__CHIEN = 1;
+   parameter FF_STEP__CHIEN = 2;
+   parameter FF_NUM__CHIEN = (T_LEN/FF_STEP__CHIEN)-1;
    
    //////////////////////////////////////
    // Typedefs

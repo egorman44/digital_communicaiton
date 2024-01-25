@@ -2,7 +2,8 @@ module lib_pipe
   #(
     parameter WIDTH	= 8,
     parameter STAGE_NUM = 8,
-    parameter FF_STEP	= 4
+    parameter FF_STEP	= 4,
+    parameter FF_NUM    = (STAGE_NUM/FF_STEP)-1
     )
    (
     input 		     clk,
@@ -13,9 +14,7 @@ module lib_pipe
     output logic [WIDTH-1:0] data_o[STAGE_NUM-2:0],
     output logic 	     vld_o[STAGE_NUM-2:0]
     /* verilator lint_on UNOPTFLAT */
-    );
-
-   localparam FF_NUM    = (STAGE_NUM/FF_STEP)-1;
+    );   
    
    logic [WIDTH-1:0]  data_q[FF_NUM-1:0];
    logic 	      vld_q[FF_NUM-1:0];

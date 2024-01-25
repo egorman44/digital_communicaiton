@@ -181,11 +181,11 @@ def rs_chien_param_tb():
     verilog_sources.append(proj_path / "lib" / "lib_mux_onehot.sv")
     verilog_sources.append(proj_path / "lib" / "lib_ffs.sv")
     verilog_sources.append(proj_path / "lib" / "lib_mux_ffs.sv")
+    verilog_sources.append(proj_path / "lib" / "lib_pipe.sv")
     verilog_sources.append(proj_path / "lib" / "lib_bin_to_vld.sv")
     verilog_sources.append(proj_path / "lib" / "lib_decmps_to_pow2.sv")
     verilog_sources.append(proj_path / "rs" / "rtl" / "gf_pkg.sv")
     verilog_sources.append(proj_path / "rs" / "rtl" / "gf_poly_eval.sv")
-    verilog_sources.append(proj_path / "rs" / "rtl" / "rs_chien.sv")
     verilog_sources.append(proj_path / "rs" / "rtl" / "rs_chien_param.sv")
 
     # Parameters    

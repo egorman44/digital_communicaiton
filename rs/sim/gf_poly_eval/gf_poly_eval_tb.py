@@ -87,9 +87,20 @@ async def gf_poly_3(dut):
     
     await Timer(10, units = "ns")
     dut.poly.value = poly
-    dut.symb.value = symb
     dut.vld_i.value = 1
+    dut.symb.value = 1    
     await RisingEdge(aclk)
+    dut.symb.value = 2
+    await RisingEdge(aclk)    
+    dut.vld_i.value = 0
+    for i in range(5):
+        await RisingEdge(aclk)
+    await RisingEdge(aclk)
+    dut.vld_i.value = 1
+    dut.symb.value = 4
+    #await RisingEdge(aclk)
+    #dut.symb.value = 4
+    await RisingEdge(aclk)    
     dut.vld_i.value = 0
 
     for i in range(12):
