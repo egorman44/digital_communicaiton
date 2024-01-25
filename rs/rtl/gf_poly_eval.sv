@@ -15,21 +15,26 @@ module gf_poly_eval
    logic [T_LEN-1:0] 	    poly_vld;   
    logic [SYMB_WIDTH-1:0]  gf_mult_intrm[T_LEN-1:0];
    /* verilator lint_off ALWCOMBORDER */
-   logic [SYMB_WIDTH-1:0]  xor_intrm[T_LEN-1:0];
-   logic [SYMB_WIDTH:0]    xor_and_vld_intrm[T_LEN-1:0];
-   logic 		   vld_intrm[T_LEN-1:0];
+   logic [SYMB_WIDTH*2-1:0] intrm__xor_and_symb[T_LEN-1:0];
+   logic [SYMB_WIDTH:0]     intrm__xor_and_vld[T_LEN-1:0];   
+   logic [SYMB_WIDTH-1:0]   intrm__symb[T_LEN-1:0];
+   logic [SYMB_WIDTH-1:0]   intrm__xor[T_LEN-1:0];
+   logic 		    intrm__vld[T_LEN-1:0];
+
    /* verilator lint_on ALWCOMBORDER */
 
    /* verilator lint_off UNOPTFLAT */
-   logic [SYMB_WIDTH-1:0]  intrm_data_end[T_LEN-2:0];
-   logic 		   intrm_vld_end[T_LEN-2:0];
+   logic [SYMB_WIDTH*2-1:0] end__xor_and_symb[T_LEN-2:0];
+   logic [SYMB_WIDTH-1:0]  end__xor[T_LEN-2:0];
+   logic [SYMB_WIDTH-1:0]  end__symb[T_LEN-2:0];
+   logic 		   end__vld[T_LEN-2:0];
    /* verilator lint_on UNOPTFLAT */
    logic [SYMB_WIDTH:0]    xor_and_vld_out;
    if(FF_STEP__CHIEN != 0) begin : PIPELING_POLY_EVAL
       
       lib_pipe 
 	#(
-	  .WIDTH(SYMB_WIDTH),
+	  .WIDTH(SYMB_WIDTH*2),
 	  .STAGE_NUM(T_LEN),
 	  .FF_STEP(FF_STEP__CHIEN)
 	  )
@@ -37,10 +42,10 @@ module gf_poly_eval
 	  (
 	   .clk(aclk),
 	   .rstn(aresetn),
-	   .data_i(xor_intrm),
-	   .vld_i(vld_intrm),
-	   .data_o(intrm_data_end),
-	   .vld_o(intrm_vld_end)
+	   .data_i(intrm__xor_and_symb),
+	   .vld_i(intrm__vld),
+	   .data_o(end__xor_and_symb),
+	   .vld_o(end__vld)
 	   );
       
    end // block: PIPELING_POLY_EVAL   
@@ -48,7 +53,7 @@ module gf_poly_eval
 
       always_comb begin
 	 for(int i =0; i < T_LEN-1; ++i)
-	   intrm_data_end[i] = xor_intrm[i];
+	   end__xor[i] = intrm__xor[i];
       end
    
    end
@@ -57,17 +62,21 @@ module gf_poly_eval
    always_comb begin
       for(int i = 0; i < T_LEN; ++i) begin
 	 poly_vld[i] = |poly[T_LEN-1-i];
+	 {end__xor[i], end__symb[i]} = end__xor_and_symb[i];
    	 if(i == 0) begin
 	   // There is always 1 in posiiton POLY[T_LEN] 
    	    gf_mult_intrm[i]	= gf_mult(1,symb); 
-	    vld_intrm[i]        = vld_i;
+	    intrm__vld[i]        = vld_i;
+	    intrm__symb[i]	= symb;
 	 end
    	 else begin
-   	    gf_mult_intrm[i]	= gf_mult(intrm_data_end[i-1], symb);
-	    vld_intrm[i]        = intrm_vld_end[i-1];
+   	    gf_mult_intrm[i]	= gf_mult(end__xor[i-1], end__symb[i-1]);
+	    intrm__vld[i]        = end__vld[i-1];
+	    intrm__symb[i]       = end__symb[i-1];
 	 end	 
-   	 xor_intrm[i]		= gf_mult_intrm[i] ^ poly[T_LEN-1-i];
-	 xor_and_vld_intrm[i]   = {xor_intrm[i], vld_intrm[i]};
+   	 intrm__xor[i]		= gf_mult_intrm[i] ^ poly[T_LEN-1-i];
+	 intrm__xor_and_vld[i]  = {intrm__xor[i], intrm__vld[i]};
+	 intrm__xor_and_symb[i] = {intrm__xor[i], intrm__symb[i]};
       end
    end // always_comb
 
@@ -81,7 +90,7 @@ module gf_poly_eval
    lib_mux_ffs_inst
      (
       .base(base),
-      .data_i(xor_and_vld_intrm),
+      .data_i(intrm__xor_and_vld),
       .sel_non_ffs(poly_vld),
       .data_o(xor_and_vld_out),
       .sel_ffs()
