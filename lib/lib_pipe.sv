@@ -45,8 +45,8 @@ module lib_pipe
 
    always_comb begin
       for(int i = 0; i < FF_NUM; ++i) begin
-	 vld_o[(i*FF_STEP)+FF_STEP-1] = vld_q[(i*FF_STEP)+FF_STEP-1];
-	 data_o[(i*FF_STEP)+FF_STEP-1] = data_q[(i*FF_STEP)+FF_STEP-1];	 
+	 vld_o[(i*FF_STEP)+FF_STEP-1] = vld_q[i];
+	 data_o[(i*FF_STEP)+FF_STEP-1] = data_q[i];	 
       end
       for(int i = 0; i < STAGE_NUM-1; ++i) begin
 	if( (i+1) % FF_STEP != 0 ) begin
@@ -54,6 +54,16 @@ module lib_pipe
 	   vld_o[i] = vld_i[i];
 	end
       end
-   end
+   end // always_comb
+   
+   //initial begin
+   //   for(int i = 0; i < FF_NUM; ++i) begin
+   //	 $display("q_connection[%0d]",(i*FF_STEP)+FF_STEP-1);
+   //   end
+   //   for(int i = 0; i < STAGE_NUM-1; ++i) begin
+   //	 if( (i+1) % FF_STEP != 0 )
+   //	   $display("wire_connection[%0d]", i);
+   //   end
+   //end
    
 endmodule // lib_pipe
