@@ -4,15 +4,17 @@ module gf_poly_eval
     input 		    aclk,
     input 		    aresetn,
     input 		    vld_i,
-    input [SYMB_WIDTH-1:0]  poly [T_LEN:0], 
+    input [SYMB_WIDTH-1:0]  poly [T_LEN:0],
+    input [T_LEN-1:0] 	    poly_sel,
     input [SYMB_WIDTH-1:0]  symb,
     output [SYMB_WIDTH-1:0] eval_value,
     output 		    vld_o
    );
 
    // TODO: make sure that there is no new POLY while current is in proc.
-   // TODO: check that nonvalid poly is always zero.
-   logic [T_LEN-1:0] 	    poly_vld;   
+   // What should be the pause in between last cycle of POLY_0 and first
+   // cycle of POLY_1
+   
    logic [SYMB_WIDTH-1:0]  gf_mult_intrm[T_LEN-1:0];
    /* verilator lint_off ALWCOMBORDER */
    logic [SYMB_WIDTH*2-1:0] intrm__xor_and_symb[T_LEN-1:0];
@@ -30,13 +32,15 @@ module gf_poly_eval
    logic 		   end__vld[T_LEN-2:0];
    /* verilator lint_on UNOPTFLAT */
    logic [SYMB_WIDTH:0]    xor_and_vld_out;
+   
    if(FF_STEP__CHIEN != 0) begin : PIPELING_POLY_EVAL
       
       lib_pipe 
 	#(
 	  .WIDTH(SYMB_WIDTH*2),
 	  .STAGE_NUM(T_LEN),
-	  .FF_STEP(FF_STEP__CHIEN)
+	  .FF_STEP(FF_STEP__CHIEN),
+	  .FF_NUM(FF_NUM__CHIEN)
 	  )
 	lib_pipe_inst
 	  (
@@ -52,8 +56,11 @@ module gf_poly_eval
    else begin : NO_PIPELING
 
       always_comb begin
-	 for(int i =0; i < T_LEN-1; ++i)
-	   end__xor[i] = intrm__xor[i];
+	 for(int i =0; i < T_LEN-1; ++i) begin
+	    end__xor[i] = intrm__xor[i];
+	    end__vld[i] = intrm__vld[i];
+	    end__symb[i] = end__symb[i];
+	 end
       end
    
    end
@@ -61,7 +68,6 @@ module gf_poly_eval
    
    always_comb begin
       for(int i = 0; i < T_LEN; ++i) begin
-	 poly_vld[i] = |poly[T_LEN-1-i];
 	 {end__xor[i], end__symb[i]} = end__xor_and_symb[i];
    	 if(i == 0) begin
 	   // There is always 1 in posiiton POLY[T_LEN] 
@@ -91,7 +97,7 @@ module gf_poly_eval
      (
       .base(base),
       .data_i(intrm__xor_and_vld),
-      .sel_non_ffs(poly_vld),
+      .sel_non_ffs(poly_sel),
       .data_o(xor_and_vld_out),
       .sel_ffs()
       );
