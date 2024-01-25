@@ -77,11 +77,11 @@ async def rs_syndrome_test(dut):
     ###################################################
     
     random.seed(123)
-
+    
     # System signals
     aclk    = dut.aclk
     aresetn = dut.aresetn
-
+    
     # Connect AXIS interdace
     s_if = AxisIf(aclk=aclk,
                   tdata=dut.error_locator,

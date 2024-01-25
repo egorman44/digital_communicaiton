@@ -39,6 +39,7 @@ package gf_pkg;
    // Parameterized Chien search
    //
    // NON_VALID__CHIEN - shows which bits of error position vector is not valid.
+   // FF_STEP__CHIEN - set value N to insert register after N number of stages.
    //////////////////////////////////////
    
    parameter ROOTS_PER_CYCLE__CHIEN = `ROOTS_PER_CYCLE__CHIEN;
@@ -46,7 +47,9 @@ package gf_pkg;
    parameter NON_VALID__CHIEN = ROOTS_NUM__CHIEN % ROOTS_PER_CYCLE__CHIEN; 
    parameter CYCLES_NUM__CHIEN = (NON_VALID__CHIEN != 0) ? ((ROOTS_NUM__CHIEN / ROOTS_PER_CYCLE__CHIEN) + 1) : (ROOTS_NUM__CHIEN/ROOTS_PER_CYCLE__CHIEN);   
    parameter CNTR_WIDTH__CHIEN = $clog2(CYCLES_NUM__CHIEN);
-
+   
+   parameter FF_STEP__CHIEN = 1;
+   
    //////////////////////////////////////
    // Typedefs
    //////////////////////////////////////
