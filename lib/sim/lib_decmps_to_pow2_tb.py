@@ -32,33 +32,46 @@ from coco_axis.axis import AxisResponder
 from coco_axis.axis import AxisMonitor
 from coco_axis.axis import AxisIf
 
-WIDTH = 255
-FFS_NUM = 9
+WIDTH = 16
+FFS_NUM = 8
 LSB_MSB = 1
+FF_STEP = 4
 
 @cocotb.test()
 async def lib_decmps_to_pow2_test(dut):
 
-    #random.seed(4)
+    random.seed(4)
     
     ###################################################
     # Conenct TB to DUT ports
     ###################################################
 
+    # System signals
+    aclk    = dut.clk
+    aresetn = dut.rstn
+    
     ###################################################
     # START TEST
     ###################################################
+    await cocotb.start(reset_dut(aresetn,100))
+    await Timer(50, units = "ns")    
+    await cocotb.start(custom_clock(aclk))
+
+    await RisingEdge(aresetn)
+    for i in range(3):
+        await RisingEdge(aclk)
+    
     vect = random.randint(1,(2 ** WIDTH)-1)
-    #bypass = (2 ** random.randint(1,WIDTH))-1
-    bypass = (2 ** random.randint(1,3))-1
+    bypass = 0
+    #bypass = (2 ** random.randint(1,3))-1
     
     print(f"vect = {vect}")
     print(f"bypass = {bypass}")
     
-    await Timer(10, units = "ns")
     dut.vect.value = vect
     dut.bypass.value = bypass
-    await Timer(50, units = "ns")
+    for i in range(10):
+        await RisingEdge(aclk)
     
 def lib_decmps_to_pow2_tb():
 
@@ -75,13 +88,15 @@ def lib_decmps_to_pow2_tb():
     f_file          = []
 
     verilog_sources.append(proj_path / "lib_decmps_to_pow2.sv")
+    verilog_sources.append(proj_path / "lib_pipe.sv")
     verilog_sources.append(proj_path / "lib_ffs.sv")
 
     # Parameters    
     parameters = {
         "WIDTH"   : WIDTH,
         "LSB_MSB" : LSB_MSB,
-        "FFS_NUM" : FFS_NUM
+        "FFS_NUM" : FFS_NUM,
+        "FF_STEP" : FF_STEP
                   }
     
     # Defines    
