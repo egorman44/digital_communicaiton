@@ -20,9 +20,7 @@ module lib_decmps_to_pow2
 
    /* verilator lint_off UNOPTFLAT */
    logic [WIDTH-1:0] 	intrm__vect[FFS_NUM-1:0];
-   logic [WIDTH-1:0] 	intrm__handled_bits[FFS_NUM-1:0];
-   logic [WIDTH-1:0] 	end__handled_bits[FFS_NUM-1:0];   
-   logic [WIDTH-1:0] 	end__vect[FFS_NUM-1:0];
+   logic [WIDTH-1:0] 	end__vect[FFS_NUM-2:0];
    /* verilator lint_on UNOPTFLAT */
 
    logic [WIDTH-1:0] 	ffs_vect_in[FFS_NUM-1:0];   
@@ -48,24 +46,14 @@ module lib_decmps_to_pow2
 	   onehot_bypass[i] = (bypass[i]) ? '0 : ffs_vect_out[i];
       end
       //////////////////////////////////
-      // XOR FFS output to accumulate bits 
-      // that were already handled
-      //////////////////////////////////
-      for(int i=0; i < FFS_NUM; ++i) begin
-	 if(i == 0)
-	   intrm__handled_bits[i] = onehot_bypass[i];
-	 else
-	   intrm__handled_bits[i] = end__handled_bits[i-1] ^ onehot_bypass[i];
-      end
-      //////////////////////////////////
       // Filter out bits from the input 
       // vector that were already handled
       //////////////////////////////////
       for(int i=0; i < FFS_NUM; ++i) begin
 	 if(i == 0)
-	   intrm__vect[i] = intrm__handled_bits[i] ^ vect;
+	   intrm__vect[i] = onehot_bypass[i] ^ vect;
 	 else
-	   intrm__vect[i] = intrm__handled_bits[i] ^ end__vect[i-1];
+	   intrm__vect[i] = onehot_bypass[i] ^ end__vect[i-1];
       end
    end
 
@@ -97,27 +85,10 @@ module lib_decmps_to_pow2
    //////////////////////////////////
    
    if(FF_STEP != 0) begin : PIPELING
-
-      typedef struct packed {
-	 logic [WIDTH-1:0] ffs_vect;
-	 logic [WIDTH-1:0] handled_bits;
-      } pipe_data_t;
-
-      pipe_data_t intrm__data[FFS_NUM-1:0];
-      pipe_data_t end__data[FFS_NUM-1:0];
-
-      always_comb begin
-	 for(int i = 0; i < FFS_NUM; ++i) begin
-	    end__vect[i] = end__data.ffs_vect[i];
-	    end__handled_bits[i] = end__data.handled_bits[i];
-	    intrm__data.ffs_vect[i] = intrm__vect[i];
-	    intrm__data.handled_bits[i] = intrm__handled_bits[i];
-	 end
-      end
-   
+      
       lib_pipe 
 	#(
-	  .WIDTH($bits(pipe_data_t)),
+	  .WIDTH(WIDTH),
 	  .STAGE_NUM(FFS_NUM),
 	  .FF_STEP(FF_STEP)
 	  )
@@ -125,9 +96,9 @@ module lib_decmps_to_pow2
 	  (
 	   .clk(clk),
 	   .rstn(rstn),
-	   .data_i(intrm__data),
+	   .data_i(intrm__vect),
 	   .vld_i(),
-	   .data_o(end__data),
+	   .data_o(end__vect),
 	   .vld_o()
 	   );
       
@@ -136,7 +107,6 @@ module lib_decmps_to_pow2
 
       always_comb begin
 	 for(int i = 0; i < FFS_NUM; ++i) begin
-	    end__handled_bits[i] = intrm__handled_bits[i];
 	    end__vect[i] = intrm__vect[i];
 	 end
       end // always_comb
