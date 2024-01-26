@@ -8,10 +8,11 @@ module lib_decmps_to_pow2
     parameter LSB_MSB	= 0,
     parameter WIDTH	= 16,
     parameter FFS_NUM	= WIDTH,
-    parameter FF_STEP   = 0,
-    parameter FF_NUM    = (WIDTH/FF_STEP)-1
+    parameter FF_STEP   = 0
     )
    (
+    input 		clk,
+    input 		rstn,
     input [WIDTH-1:0] 	vect,
     input [FFS_NUM-1:0] bypass,
     output [WIDTH-1:0] 	onehot[FFS_NUM-1:0]
@@ -24,11 +25,17 @@ module lib_decmps_to_pow2
    logic [WIDTH-1:0] 	end__vect[FFS_NUM-1:0];
    /* verilator lint_on UNOPTFLAT */
 
-   		       
+   logic [WIDTH-1:0] 	ffs_vect_in[FFS_NUM-1:0];   
    wire [WIDTH-1:0] 	ffs_vect_out[FFS_NUM-1:0];   
    logic [WIDTH-1:0] 	onehot_bypass[FFS_NUM-1:0];   
    
    always_comb begin
+      for(int i=0; i < FFS_NUM; ++i) begin
+	 if(i == 0)
+	   ffs_vect_in[i] = vect;
+	 else
+	   ffs_vect_in[i] = end__vect[i-1];
+      end
       //////////////////////////////////
       // Dissable FFS output if it's bypassed,
       // there is no need to bypass 
@@ -77,7 +84,7 @@ module lib_decmps_to_pow2
 		    )
       lib_ffs_inst
 		  (
-		   .vect(end__vect[i]),
+		   .vect(ffs_vect_in[i]),
 		   .base(base),
 		   .vect_ffs(ffs_vect_out[i])
 		   );
@@ -100,23 +107,24 @@ module lib_decmps_to_pow2
       pipe_data_t end__data[FFS_NUM-1:0];
 
       always_comb begin
-	 end__vect = end__data.ffs_vect;
-	 end__handled_bits = end__data.handled_bits;
-	 intrm__data.ffs_vect = intrm__vect;
-	 intrm__data.handled_bits = intrm__handled_bits;
+	 for(int i = 0; i < FFS_NUM; ++i) begin
+	    end__vect[i] = end__data.ffs_vect[i];
+	    end__handled_bits[i] = end__data.handled_bits[i];
+	    intrm__data.ffs_vect[i] = intrm__vect[i];
+	    intrm__data.handled_bits[i] = intrm__handled_bits[i];
+	 end
       end
    
       lib_pipe 
 	#(
-	  .WIDTH(SYMB_WIDTH*2),
-	  .STAGE_NUM(T_LEN),
-	  .FF_STEP(FF_STEP__CHIEN),
-	  .FF_NUM(FF_NUM__CHIEN)
+	  .WIDTH($bits(pipe_data_t)),
+	  .STAGE_NUM(FFS_NUM),
+	  .FF_STEP(FF_STEP)
 	  )
 	lib_pipe_inst
 	  (
-	   .clk(aclk),
-	   .rstn(aresetn),
+	   .clk(clk),
+	   .rstn(rstn),
 	   .data_i(intrm__data),
 	   .vld_i(),
 	   .data_o(end__data),
@@ -127,10 +135,12 @@ module lib_decmps_to_pow2
    else begin
 
       always_comb begin
-	 end__vect = intrm__vect;
-	 end__handled_bits = intrm__handled_bits;	 
-      end
-      
+	 for(int i = 0; i < FFS_NUM; ++i) begin
+	    end__handled_bits[i] = intrm__handled_bits[i];
+	    end__vect[i] = intrm__vect[i];
+	 end
+      end // always_comb
+         
    end
 
 endmodule // lib_decmps_to_pow2
