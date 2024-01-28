@@ -33,14 +33,14 @@ module gf_poly_eval
    /* verilator lint_on UNOPTFLAT */
    logic [SYMB_WIDTH:0]    xor_and_vld_out;
    
-   if(FF_STEP__CHIEN != 0) begin : PIPELING_POLY_EVAL
+   if(FF_STEP__CHIEN_POLY_EVAL != 0) begin : PIPELING_POLY_EVAL
       
       lib_pipe 
 	#(
 	  .WIDTH(SYMB_WIDTH*2),
 	  .STAGE_NUM(T_LEN),
-	  .FF_STEP(FF_STEP__CHIEN),
-	  .FF_NUM(FF_NUM__CHIEN)
+	  .FF_STEP(FF_STEP__CHIEN_POLY_EVAL),
+	  .FF_NUM(FF_NUM__CHIEN_POLY_EVAL)
 	  )
 	lib_pipe_inst
 	  (
