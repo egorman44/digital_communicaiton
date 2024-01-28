@@ -11,13 +11,17 @@ module lib_decmps_to_pow2
     parameter FF_STEP   = 0
     )
    (
-    input 		clk,
-    input 		rstn,
-    input [WIDTH-1:0] 	vect,
-    input [FFS_NUM-1:0] bypass,
-    output [WIDTH-1:0] 	onehot[FFS_NUM-1:0]
+    input 		       clk,
+    input 		       rstn,
+    input [WIDTH-1:0] 	       vect,
+    input [FFS_NUM-1:0]        bypass,
+    input 		       vld_i,
+    output logic [FFS_NUM-1:0] vld_o,
+    output [WIDTH-1:0] 	       onehot[FFS_NUM-1:0]
     );
 
+   logic 		intrm__vld[FFS_NUM-1:0];
+   logic 		end__vld[FFS_NUM-2:0];
    /* verilator lint_off UNOPTFLAT */
    logic [WIDTH-1:0] 	intrm__vect[FFS_NUM-1:0];
    logic [WIDTH-1:0] 	end__vect[FFS_NUM-2:0];
@@ -29,10 +33,15 @@ module lib_decmps_to_pow2
    
    always_comb begin
       for(int i=0; i < FFS_NUM; ++i) begin
-	 if(i == 0)
-	   ffs_vect_in[i] = vect;
-	 else
-	   ffs_vect_in[i] = end__vect[i-1];
+	 if(i == 0) begin
+	    ffs_vect_in[i] = vect;
+	    intrm__vld[i] = vld_i;
+	 end
+	 else begin
+	    ffs_vect_in[i] = end__vect[i-1];
+	    intrm__vld[i] = end__vld[i-1];
+	 end
+	 vld_o[i] = intrm__vld[i];
       end
       //////////////////////////////////
       // Dissable FFS output if it's bypassed,
@@ -56,7 +65,7 @@ module lib_decmps_to_pow2
 	   intrm__vect[i] = onehot_bypass[i] ^ end__vect[i-1];
       end
    end
-
+   
    wire [WIDTH-1:0] base = { {WIDTH-1{1'b0}}, 1'b1 };
 
    //////////////////////////////////
@@ -97,20 +106,20 @@ module lib_decmps_to_pow2
 	   .clk(clk),
 	   .rstn(rstn),
 	   .data_i(intrm__vect),
-	   .vld_i(),
+	   .vld_i(intrm__vld),
 	   .data_o(end__vect),
-	   .vld_o()
+	   .vld_o(end__vld)
 	   );
       
    end
    else begin
-
+      
       always_comb begin
 	 for(int i = 0; i < FFS_NUM; ++i) begin
-	    end__vect[i] = intrm__vect[i];
+	    end__vect[i] = intrm__vect[i];	    
 	 end
       end // always_comb
-         
-   end
 
+   end
+   
 endmodule // lib_decmps_to_pow2
