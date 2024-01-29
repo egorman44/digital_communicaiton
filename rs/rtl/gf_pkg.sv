@@ -18,8 +18,8 @@ package gf_pkg;
 
 `ifndef ROOTS_PER_CYCLE__CHIEN
    // TODO: What is the ROOTS_PER_CYCLE__CHIEN 
- `define ROOTS_PER_CYCLE__CHIEN (2 ** SYMB_WIDTH)-2
- //`define ROOTS_PER_CYCLE__CHIEN 2
+ //`define ROOTS_PER_CYCLE__CHIEN (2 ** SYMB_WIDTH)-2
+ `define ROOTS_PER_CYCLE__CHIEN 16
 `endif
 
    //////////////////////////////////////
@@ -44,6 +44,7 @@ package gf_pkg;
    //
    // NON_VALID__CHIEN - shows which bits of error position vector is not valid.
    // FF_STEP__CHIEN - set value N to insert register after N number of stages.
+   // FF_STEP__CHIEN_BIT_CONV
    //////////////////////////////////////
    
    parameter ROOTS_PER_CYCLE__CHIEN = `ROOTS_PER_CYCLE__CHIEN;
@@ -52,8 +53,10 @@ package gf_pkg;
    parameter CYCLES_NUM__CHIEN = (NON_VALID__CHIEN != 0) ? ((ROOTS_NUM__CHIEN / ROOTS_PER_CYCLE__CHIEN) + 1) : (ROOTS_NUM__CHIEN/ROOTS_PER_CYCLE__CHIEN);   
    parameter CNTR_WIDTH__CHIEN = $clog2(CYCLES_NUM__CHIEN);
    
-   parameter FF_STEP__CHIEN = 2;
-   parameter FF_NUM__CHIEN = (T_LEN/FF_STEP__CHIEN)-1;
+   parameter FF_STEP__CHIEN_POLY_EVAL = 1;
+   parameter FF_NUM__CHIEN_POLY_EVAL = (T_LEN/FF_STEP__CHIEN_POLY_EVAL)-1;
+   parameter FF_STEP__CHIEN_BIT_CONV = T_LEN / 3;
+   parameter FF_NUM__CHIEN_BIT_CONV = (T_LEN/FF_STEP__CHIEN_BIT_CONV)-1;
    
    //////////////////////////////////////
    // Typedefs
