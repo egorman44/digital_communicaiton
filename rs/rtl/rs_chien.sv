@@ -24,7 +24,14 @@ module rs_chien
    wire 		    eval_rst = error_locator_vld;
 
    logic [T_LEN-1:0] 	    poly_sel;
+   wire [T_LEN-1:0] 	    lib_decmps_vld;      
+   logic 		    lib_decmps_vld_q;
 
+   // TODO: delete
+   initial begin
+      $display("FF_STEP__CHIEN_BIT_CONV = %0d, FF_NUM__CHIEN_BIT_CONV = %0d", FF_STEP__CHIEN_BIT_CONV, FF_NUM__CHIEN_BIT_CONV);
+   end
+   
    // TODO: check that nonvalid poly is always zero.
    always_comb begin
       for(int i=0; i < T_LEN; ++i) 
@@ -49,6 +56,23 @@ module rs_chien
 	 .aclk				(aclk),
 	 .aresetn			(aresetn));
 
+      //////////////////////////////
+      // Synchronize 
+      //////////////////////////////
+
+      logic lib_decmps_vld_qq;
+
+      always_ff @(posedge aclk, negedge aresetn) begin
+	 if(~aresetn) begin
+	    lib_decmps_vld_qq <= 1'b0;
+	 end
+	 else begin
+	    lib_decmps_vld_qq <= lib_decmps_vld_q;
+	 end
+      end
+
+      wire start_roots_gen = ~lib_decmps_vld_qq && lib_decmps_vld_q;
+   
       wire gf_poly_vld_pos = ~gf_poly_vld_q && gf_poly_vld[0];
       wire gf_poly_vld_neg = gf_poly_vld_q && ~gf_poly_vld[0];      
       logic gf_poly_vld_pos_q, gf_poly_vld_neg_q;
@@ -70,7 +94,7 @@ module rs_chien
 	(
 	 .alpha_current			(alpha_mux_in),
 	 .roots	          		(),
-	 .vld	   			(gf_poly_vld_pos_q),
+	 .vld	   			(start_roots_gen),
 	 .roots_vld			(),
 	 /*AUTOINST*/
 	 // Outputs	 
@@ -168,26 +192,93 @@ module rs_chien
    /////////////////////////////////////////////////
    // Convert bit posisiton to binary value
    /////////////////////////////////////////////////
+
+   logic [SYMB_WIDTH-1:0] pos_conv_st_cntr_q;
+   wire last_cycle = (pos_conv_st_cntr_q == SYMB_WIDTH'(CYCLES_NUM__CHIEN-1));
+   
+   if(FF_STEP__CHIEN_BIT_CONV == 0) begin
+   end
+   else begin
+      
+      always_ff @(posedge aclk, negedge aresetn) begin
+	 if(~aresetn) begin
+	    pos_conv_st_cntr_q	<= '0;
+	 end
+	 else begin
+	    if(vld)
+	      pos_conv_st_cntr_q <= pos_conv_st_cntr_q + 1;
+	    else if(|pos_conv_st_cntr_q) begin
+	       if(last_cycle)
+		 pos_conv_st_cntr_q <= '0;
+	       else
+		 pos_conv_st_cntr_q <= pos_conv_st_cntr_q + 1'b1;
+	    end
+	 end
+      end // always_ff @ (posedge aclk, negedge aresetn)
+
+   end
    
    logic [SYMB_WIDTH-1:0] error_positions_q[T_LEN-1:0];
    logic [T_LEN-1:0] 	  err_pos_capt_q;
    wire [ROOTS_PER_CYCLE__CHIEN-1:0] mux_sel[T_LEN-1:0];
+   logic [ROOTS_PER_CYCLE__CHIEN-1:0] mux_sel_q[T_LEN-1:0];
+   
    wire [T_LEN-1:0] 	  bypass = err_pos_capt_q;   
    wire [SYMB_WIDTH-1:0]  error_positions_mux_out[T_LEN-1:0];
-   
+
+   // TODO: add pipelined lib_decmps_to_pow2
    lib_decmps_to_pow2
      #(
        .WIDTH(ROOTS_PER_CYCLE__CHIEN),
        .FFS_NUM(T_LEN),
-       .LSB_MSB(1)
+       .LSB_MSB(1),
+       .FF_STEP(0)
        )
    lib_decmps_to_pow2_inst
      (
+      .clk(aclk),
+      .rstn(aresetn),
       .vect(error_bit_pos_q),
+      .vld_i(gf_poly_vld_q),
+      .vld_o(lib_decmps_vld),
       .bypass(bypass),
       .onehot(mux_sel)
       );
    
+   //////////////////////////////////////
+   // Capture mux_seq to choose proper
+   // roots
+   //////////////////////////////////////
+   
+   always_ff @(posedge aclk, negedge aresetn) begin
+      if(~aresetn) begin
+	 for(int i = 0; i < T_LEN; ++i) begin
+	    err_pos_capt_q[i]		<= '0;
+	    mux_sel_q[i]		<= '0;
+	 end
+      end
+      else begin	 
+	 if(|lib_decmps_vld) begin
+	    for(int i = 0; i < T_LEN; ++i) begin
+	       if(|mux_sel[i]) begin
+		  err_pos_capt_q[i]	<= |mux_sel[i];
+		  mux_sel_q[i]		<= mux_sel[i];
+	       end
+	    end
+	 end
+	 else begin
+	    for(int i = 0; i < T_LEN; ++i) begin
+	       err_pos_capt_q[i]	<= '0;
+	       mux_sel_q[i]		<= '0;
+	    end
+	 end
+      end // else: !if(~aresetn)
+   end // always_ff @ (posedge aclk, negedge aresetn)
+
+   /////////////////////////////////////////////////
+   // Selecting roots
+   /////////////////////////////////////////////////
+
    for(genvar i = 0; i < T_LEN; ++i) begin : ERROR_POSITIONS_MUX
       
       lib_mux_onehot
@@ -198,41 +289,52 @@ module rs_chien
       lib_mux_onehot_inst
 	(
 	 .data_i(alpha_mux_in),
-	 .sel(mux_sel[i]),
+	 .sel(mux_sel_q[i]),
 	 .data_o(error_positions_mux_out[i])
 	 );
       
    end // for (genvar i = 0; i < T_LEN; ++i)
 
-   //////////////////////////////////////
-   // Accumulate error positions
-   //////////////////////////////////////
+   /////////////////////////////////////////////////
+   // Capture errors positions
+   /////////////////////////////////////////////////
+
+   logic [T_LEN-1:0] error_positions_vld_q;
    
+   always_ff @(posedge aclk, negedge aresetn) begin
+      if(~aresetn) begin
+	 lib_decmps_vld_q <= 1'b0;
+      end
+      else begin
+	 lib_decmps_vld_q <= lib_decmps_vld[T_LEN-1];
+      end
+   end
+
    always_ff @(posedge aclk, negedge aresetn) begin
       if(~aresetn) begin
 	 for(int i = 0; i < T_LEN; ++i) begin
 	    error_positions_q[i] <= '0;
-	    err_pos_capt_q[i] <= '0;
+	    error_positions_vld_q[i] <= '0;
 	 end
       end
-      else begin	 
-	 if(gf_poly_vld_q) begin
+      else begin
+	 if(lib_decmps_vld_q) begin
 	    for(int i = 0; i < T_LEN; ++i) begin
-	       if(|mux_sel[i])
-		 err_pos_capt_q[i] <= |mux_sel[i];
-	       if(|mux_sel[i] && !err_pos_capt_q[i])
-		 error_positions_q[i] <= SYMB_NUM-2-error_positions_mux_out[i];	       
+	       if(|mux_sel_q[i] && !error_positions_vld_q[i]) begin
+		  error_positions_q[i] <= SYMB_NUM-2-error_positions_mux_out[i];
+		  error_positions_vld_q[i] <= 1'b1;
+	       end
 	    end
-	 end	
+	 end
 	 else begin
 	    for(int i = 0; i < T_LEN; ++i) begin
 	       error_positions_q[i] <= '0;
-	       err_pos_capt_q[i] <= '0;
+	       error_positions_vld_q[i] <= 1'b0;
 	    end
-	 end
-      end // else: !if(~aresetn)      
-   end // always_ff @ (posedge aclk, negedge aresetn)
-
+	 end	   
+      end
+   end
+   
    /////////////////////////////////////////////////
    // Error interrupt generation
    //
@@ -274,7 +376,7 @@ module rs_chien
 	   count_pos_q <= count_pos_q + count_pos;
       end
    end
-
+      
    assign error_positions = error_positions_q;
    assign rs_chien_err = (err_pos_capt_q) ? (count_pos_q > T_LEN) : 1'b0;
 
