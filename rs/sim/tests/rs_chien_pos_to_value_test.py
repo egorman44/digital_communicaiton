@@ -117,10 +117,8 @@ class  RsChienPosToValAllPosTest(RsChienPosToValBaseTest):
 
     def gen_stimilus(self):
         super().gen_stimilus()        
-        #corrupt_words_num = random.randint(1, T_LEN)
-        
-        for i in range(self.pkt_num):
-            corrupt_words_num = 1
+        corrupt_words_num = 1
+        for i in range(T_LEN):            
             ref_msg = Packet(name=f'ref_msg{i}', word_size=BUS_WIDTH_IN_SYMB)
             ref_msg.generate(K_LEN)
         
@@ -137,7 +135,7 @@ class  RsChienPosToValAllPosTest(RsChienPosToValBaseTest):
             err_pos_pkt.generate(ref_pkt=cor_msg)
             err_pos_pkt.print_pkt()
 
-            corrupt_words_num = (corrupt_words_num + 1) % T_LEN
+            corrupt_words_num = (corrupt_words_num + 1) % (T_LEN+1)
             self.ref_msgs.append(ref_msg)
             self.pkts.append(pkt)
             self.prd_pkts.append(err_pos_pkt)
