@@ -5,16 +5,16 @@ from rs import rs_find_error_locator
 from rs import rs_find_errors
 from rs import rs_correct_errata
 from rs import rs_correct_msg_nofsynd
+from rs_param import CHIEN_ROOTS_NUM
 
 from coco_env.scoreboard import Predictor
 from coco_env.packet import Packet
 
 class RsPacket(Packet):
     
-    def __init__(self, name, n_len, roots_num, word_size = 1, corrupt_words_num = 0, gen = 285, symb_width=8):
-        super().__init__(name,word_size)
+    def __init__(self, name, n_len, roots_num, corrupt_words_num = 0, gen = 285, symb_width=8):
+        super().__init__(name)
         self.n_len = n_len
-        self.word_size = word_size
         self.roots_num = roots_num
         self.corrupt_words_num = corrupt_words_num
         self.gen = gen
@@ -26,30 +26,33 @@ class RsPacket(Packet):
         self.rs_gen_data()
         
     def rs_gen_data(self):
-        msg = self.get_byte_list()
+        print(f"self.data = {self.data} len = {len(self.data)}")
+        msg = self.data.copy()
+        print("HERE0")
         enc_msg = rs_encode_msg(msg_in=msg, nsym=self.roots_num)
-        self.write_byte_list(enc_msg)
+        print("HERE0")
+        self.data = enc_msg.copy()
         if self.corrupt_words_num != 0:
             self.corrupt_pkt(self.corrupt_words_num)
+        self.print_pkt()
         
 class RsSyndromePacket(RsPacket):
     
     def rs_gen_data(self):
         #super().rs_gen_data()        
-        enc_msg = self.get_byte_list()
+        enc_msg = self.data
         syndrome = rs_calc_syndromes(enc_msg, self.roots_num)
         syndrome.pop(0)
         syndrome.reverse()
         self.pkt_size = self.roots_num
-        self.word_size = self.roots_num
-        self.write_byte_list(syndrome)
+        self.data = syndrome.copy()
 
 class RsErrLocatorPacket(RsPacket):
     
     def rs_gen_data(self):
         t_len = math.floor(self.roots_num/2) + 1
         #super().rs_gen_data()
-        enc_msg = self.get_byte_list()
+        enc_msg = self.data
         syndrome = rs_calc_syndromes(enc_msg, self.roots_num)
         error_locator = rs_find_error_locator(syndrome, self.roots_num)
         error_locator.reverse()
@@ -57,36 +60,31 @@ class RsErrLocatorPacket(RsPacket):
                zeros = [0] * (t_len - len(error_locator))
                error_locator = error_locator + zeros
         self.pkt_size = t_len
-        self.word_size = t_len
-        self.write_byte_list(error_locator)
+        self.data = error_locator.copy()
 
 class RsErrPositionPacket(RsPacket):
     
     def rs_gen_data(self):
         t_len = math.floor(self.roots_num/2) + 1
         #super().rs_gen_data()
-        enc_msg = self.get_byte_list()
+        enc_msg = self.data
         syndrome = rs_calc_syndromes(enc_msg, self.roots_num)
         error_locator = rs_find_error_locator(syndrome, self.roots_num)
         error_locator = error_locator[::-1]
         error_position = rs_find_errors(error_locator,len(enc_msg))
-        print(f"{self.name}.syndrome = {syndrome}")
-        print(f"{self.name}.error_locator = {error_locator}")
-        print(f"{self.name}.error_position = {error_position}")
-        print(f"{self.name}.t_len = t_len")
-        #if(len(error_position) < t_len):
-        #       zeros = [0] * (t_len - len(error_locator))
-        #       error_position = error_locator + zeros
+        #print(f"{self.name}.syndrome = {syndrome}")
+        #print(f"{self.name}.error_locator = {error_locator}")
+        #print(f"{self.name}.error_position = {error_position}")
+        #print(f"{self.name}.t_len = t_len")
         self.pkt_size = len(error_position)
-        self.word_size = t_len-1
-        self.write_byte_list(error_position)
+        self.data = error_position.copy()
 
 class RsErrBitPositionPacket(RsPacket):
     
     def rs_gen_data(self):
         t_len = math.floor(self.roots_num/2) + 1
         #super().rs_gen_data()
-        enc_msg = self.get_byte_list()
+        enc_msg = self.data
         syndrome = rs_calc_syndromes(enc_msg, self.roots_num)
         error_locator = rs_find_error_locator(syndrome, self.roots_num)
         error_locator = error_locator[::-1]
@@ -94,23 +92,21 @@ class RsErrBitPositionPacket(RsPacket):
         error_bit_position = 0
         for pos in error_position:
             error_bit_position |= 1 << pos        
-        print(f"{self.name}.syndrome = {syndrome}")
-        print(f"{self.name}.error_locator = {error_locator}")
-        print(f"{self.name}.error_position = {error_position}")
+        #print(f"{self.name}.syndrome = {syndrome}")
+        #print(f"{self.name}.error_locator = {error_locator}")
+        #print(f"{self.name}.error_position = {error_position}")
         print(f"{self.name}.error_bit_position = {error_bit_position:x}")
-        #if(len(error_position) < t_len):
-        #       zeros = [0] * (t_len - len(error_locator))
-        #       error_position = error_locator + zeros
-        self.pkt_size = len(error_position)
-        self.word_size = 2
-        self.write_value(error_bit_position, 2 ** self.symb_width - 2)
+        self.pkt_size = math.ceil(CHIEN_ROOTS_NUM/8)
+        print(f"pkt_sizeq = {self.pkt_size} {CHIEN_ROOTS_NUM}")
+        self.write_number(error_bit_position, 2 ** self.symb_width - 2)
+        self.print_pkt("WERE")
         
 class RsErrValuePacket(RsPacket):
     
     def rs_gen_data(self):
         t_len = math.floor(self.roots_num/2) + 1
         #super().rs_gen_data()
-        enc_msg = self.get_byte_list()        
+        enc_msg = self.data        
         syndrome = rs_calc_syndromes(enc_msg, self.roots_num)
         print(f"{self.name}.syndrome = {syndrome}")
         error_locator = rs_find_error_locator(syndrome, self.roots_num)
@@ -121,8 +117,7 @@ class RsErrValuePacket(RsPacket):
         _, magnitude = rs_correct_errata(enc_msg, syndrome, error_position)
         print(f"{self.name}.magnitude = {magnitude}, {self.roots_num}")
         self.pkt_size = len(magnitude)
-        self.word_size = t_len
-        self.write_byte_list(magnitude)        
+        self.data = magnitude.copy()
         self.print_pkt("RsErrValuePacket")
                 
 class RsDecodedPacket(RsPacket):
@@ -130,7 +125,7 @@ class RsDecodedPacket(RsPacket):
     def rs_gen_data(self):
         t_len = math.floor(self.roots_num/2) + 1
         #super().rs_gen_data()
-        enc_msg = self.get_byte_list()        
+        enc_msg = self.data        
         syndrome = rs_calc_syndromes(enc_msg, self.roots_num)
         print(f"{self.name}.syndrome = {syndrome}")
         error_locator = rs_find_error_locator(syndrome, self.roots_num)
@@ -140,8 +135,7 @@ class RsDecodedPacket(RsPacket):
         print(f"{self.name}.error_position = {error_position}")
         out_msg, magnitude = rs_correct_errata(enc_msg, syndrome, error_position)
         out_msg = out_msg[:-self.roots_num]
-        
-        self.write_byte_list(out_msg)
+        self.data = out_msg.copy()
         self.pkt_size = len(out_msg)
         
 '''
@@ -161,7 +155,7 @@ class SyndrPredictor(Predictor):
             syndrome.reverse()
             syndr_pkt = Packet(self.roots_num)
             syndr_pkt.pkt_size = self.roots_num
-            syndr_pkt.write_byte_list(syndrome)
+            #syndr_pkt.write_byte_list(syndrome)
             syndr_pkt.print_pkt(self.name)
             self.port_prd.append(syndr_pkt)
 
@@ -182,7 +176,7 @@ class ErrLocatorPredictor(Predictor):
                error_locator = error_locator + zeros
             syndr_pkt = Packet(t_len)
             syndr_pkt.pkt_size = t_len
-            syndr_pkt.write_byte_list(error_locator)
+            #syndr_pkt.write_byte_list(error_locator)
             syndr_pkt.print_pkt(self.name)
             self.port_prd.append(syndr_pkt)
 
@@ -206,7 +200,7 @@ class ErrPositionPredictor(Predictor):
             error_position_bin = [error_position ^ xor_vector]
             err_pos_pkt = RsErrPosPacket(self.roots_num)
             err_pos_pkt.pkt_size = self.n_len
-            err_pos_pkt.write_byte_list(error_position_bin)
+            #err_pos_pkt.write_byte_list(error_position_bin)
             err_pos_pkt.print_pkt()
             self.port_prd.append(err_pos_pkt)
 
@@ -224,8 +218,7 @@ class ErrValuePredictor(Predictor):
         for pkt in self.port_in:
             err_val_pkt = RsErrValuePacket(name=self.name,
                                            n_len=self.n_len,
-                                           roots_num=self.roots_num,
-                                           word_size = pkt.word_size)
+                                           roots_num=self.roots_num)
             err_val_pkt.generate(ref_pkt=pkt)
             self.port_prd.append(err_val_pkt)
 
