@@ -11,12 +11,14 @@ from coco_env.packet import Packet
 
 class RsPacket(Packet):
     
-    def __init__(self, name, n_len, roots_num, word_size = 1, corrupt_words_num = 0, gen = 285):
+    def __init__(self, name, n_len, roots_num, word_size = 1, corrupt_words_num = 0, gen = 285, symb_width=8):
         super().__init__(name,word_size)
         self.n_len = n_len
+        self.word_size = word_size
         self.roots_num = roots_num
         self.corrupt_words_num = corrupt_words_num
         self.gen = gen
+        self.symb_width = symb_width
     
     def gen_data(self, pattern, ref_data = None):
         # Generate origin message
@@ -69,14 +71,40 @@ class RsErrPositionPacket(RsPacket):
         error_locator = error_locator[::-1]
         error_position = rs_find_errors(error_locator,len(enc_msg))
         print(f"{self.name}.syndrome = {syndrome}")
+        print(f"{self.name}.error_locator = {error_locator}")
         print(f"{self.name}.error_position = {error_position}")
+        print(f"{self.name}.t_len = t_len")
         #if(len(error_position) < t_len):
         #       zeros = [0] * (t_len - len(error_locator))
         #       error_position = error_locator + zeros
         self.pkt_size = len(error_position)
-        self.word_size = t_len
+        self.word_size = t_len-1
         self.write_byte_list(error_position)
 
+class RsErrBitPositionPacket(RsPacket):
+    
+    def rs_gen_data(self):
+        t_len = math.floor(self.roots_num/2) + 1
+        #super().rs_gen_data()
+        enc_msg = self.get_byte_list()
+        syndrome = rs_calc_syndromes(enc_msg, self.roots_num)
+        error_locator = rs_find_error_locator(syndrome, self.roots_num)
+        error_locator = error_locator[::-1]
+        error_position = rs_find_errors(err_loc=error_locator, nmess=len(enc_msg), convert=0)
+        error_bit_position = 0
+        for pos in error_position:
+            error_bit_position |= 1 << pos        
+        print(f"{self.name}.syndrome = {syndrome}")
+        print(f"{self.name}.error_locator = {error_locator}")
+        print(f"{self.name}.error_position = {error_position}")
+        print(f"{self.name}.error_bit_position = {error_bit_position:x}")
+        #if(len(error_position) < t_len):
+        #       zeros = [0] * (t_len - len(error_locator))
+        #       error_position = error_locator + zeros
+        self.pkt_size = len(error_position)
+        self.word_size = 2
+        self.write_value(error_bit_position, 2 ** self.symb_width - 2)
+        
 class RsErrValuePacket(RsPacket):
     
     def rs_gen_data(self):
