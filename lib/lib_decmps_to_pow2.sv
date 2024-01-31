@@ -29,12 +29,14 @@ module lib_decmps_to_pow2
 
    logic [WIDTH-1:0] 	ffs_vect_in[FFS_NUM-1:0];   
    wire [WIDTH-1:0] 	ffs_vect_out[FFS_NUM-1:0];   
-   logic [WIDTH-1:0] 	onehot_bypass[FFS_NUM-1:0];   
+   logic [WIDTH-1:0] 	onehot_bypass[FFS_NUM-1:0];
    
+   wire [WIDTH-1:0] 	vect_is_vld = (vld_i) ? vect : '0;   
+
    always_comb begin
       for(int i=0; i < FFS_NUM; ++i) begin
 	 if(i == 0) begin
-	    ffs_vect_in[i] = vect;
+	    ffs_vect_in[i] = vect_is_vld;
 	    intrm__vld[i] = vld_i;
 	 end
 	 else begin
@@ -60,7 +62,7 @@ module lib_decmps_to_pow2
       //////////////////////////////////
       for(int i=0; i < FFS_NUM; ++i) begin
 	 if(i == 0)
-	   intrm__vect[i] = onehot_bypass[i] ^ vect;
+	   intrm__vect[i] = onehot_bypass[i] ^ vect_is_vld;
 	 else
 	   intrm__vect[i] = onehot_bypass[i] ^ end__vect[i-1];
       end
