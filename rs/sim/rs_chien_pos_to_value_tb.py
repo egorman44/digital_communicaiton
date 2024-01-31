@@ -65,8 +65,6 @@ print(f"ROOTS_PER_CYCLE__BYTES = {ROOTS_PER_CYCLE__BYTES}")
 @cocotb.test()
 async def random_test(dut):
     
-    random.seed(123)
-    
     test = RsChienPosToValRandomTest(dut)
     test.set_if()
     test.build_env()
@@ -76,8 +74,6 @@ async def random_test(dut):
 
 @cocotb.test()
 async def all_positions_test(dut):
-    
-    #random.seed(123)
     
     test = RsChienPosToValAllPosTest(dut, T_LEN)
     test.set_if()
@@ -137,4 +133,5 @@ def rs_chien_pos_to_value_tb():
 
 
 if __name__ == "__main__":
+    #os.environ["RANDOM_SEED"] = '123'
     rs_chien_pos_to_value_tb()
