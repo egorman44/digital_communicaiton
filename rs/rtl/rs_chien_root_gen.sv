@@ -9,11 +9,11 @@ module rs_chien_root_gen
    output 			 roots_vld
    );
 
-   logic [SYMB_WIDTH-1:0] chien_st_cntr_q;         
+   logic [CNTR_WIDTH__CHIEN-1:0] chien_st_cntr_q;
    wire [SYMB_WIDTH-1:0]  base [CYCLES_NUM__CHIEN-1:0];
    wire 		  last_cycle;
 
-   assign last_cycle = (chien_st_cntr_q == SYMB_WIDTH'(CYCLES_NUM__CHIEN-1));
+   assign last_cycle = (chien_st_cntr_q == CNTR_WIDTH__CHIEN'(CYCLES_NUM__CHIEN-1));
    
    for(genvar i =0; i < CYCLES_NUM__CHIEN; ++i) begin
       assign base[i] = i * ROOTS_PER_CYCLE__CHIEN;
