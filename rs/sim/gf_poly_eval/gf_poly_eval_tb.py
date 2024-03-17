@@ -20,6 +20,7 @@ sys.path.append(coco_path)
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
+from cocotb.triggers import FallingEdge
 from cocotb.runner import get_runner
 from cocotb.triggers import Timer
 from cocotb.types import Logic
@@ -48,8 +49,8 @@ async def gf_poly_3(dut):
     #random.seed(123)
 
     # System signals
-    aclk    = dut.aclk
-    aresetn = dut.aresetn
+    aclk    = dut.clock
+    aresetn = dut.clock
 
     init_tables()
     
@@ -60,58 +61,70 @@ async def gf_poly_3(dut):
     ###################################################
     # START TEST
     ###################################################
-    await cocotb.start(reset_dut(aresetn,100))
+    await cocotb.start(reset_dut(aresetn,100,1))
     await Timer(50, units = "ns")
     
     await cocotb.start(custom_clock(aclk))
-    await RisingEdge(aresetn)
+    await FallingEdge(aresetn)
     for i in range(10):
         await RisingEdge(aclk)
     
     poly = [0]*(T_LEN+1)
-    poly[0] = 1
+    poly[0] = 0
     #poly[1] = 222
     #poly[2] = 102
-    poly[1] = 10
-    poly[2] = 69
-    poly[3] = 15
-    poly[4] = 115
-    poly[5] = 58
-    poly[6] = 236
-    poly[7] = 57
-    poly[8] = 243
+    poly[1] = 0
+    poly[2] = 0
+    poly[3] = 0
+    poly[4] = 0
+    poly[5] = 0
+    poly[6] = 0x4f
+    poly[7] = 0xea
+    poly[8] = 1
 
+    poly_sel = 0x3
+    
     symb = 2
 
     gf_poly_eval(poly, symb)
     
     await Timer(10, units = "ns")
-    dut.poly.value = poly
-    dut.vld_i.value = 1
-    dut.symb.value = 1    
+    dut.io_errLocator_0.value = poly[0]
+    dut.io_errLocator_1.value = poly[1]
+    dut.io_errLocator_2.value = poly[2]
+    dut.io_errLocator_3.value = poly[3]
+    dut.io_errLocator_4.value = poly[4]
+    dut.io_errLocator_5.value = poly[5]
+    dut.io_errLocator_6.value = poly[6]
+    dut.io_errLocator_7.value = poly[7]
+    dut.io_errLocator_8.value = poly[8]
+    dut.io_errLocatorSel = poly_sel
+    
+    dut.io_inSymb_valid.value = 1
+    dut.io_inSymb_bits.value = 1    
     await RisingEdge(aclk)
-    dut.symb.value = 2
+    dut.io_inSymb_bits.value = 2
     await RisingEdge(aclk)    
-    dut.vld_i.value = 0
+    dut.io_inSymb_valid.value = 0
     for i in range(5):
         await RisingEdge(aclk)
     await RisingEdge(aclk)
-    dut.vld_i.value = 1
-    dut.symb.value = 4
-    #await RisingEdge(aclk)
+    #dut.vld_.value = 1
     #dut.symb.value = 4
-    await RisingEdge(aclk)    
-    dut.vld_i.value = 0
+    ##await RisingEdge(aclk)
+    ##dut.symb.value = 4
+    #await RisingEdge(aclk)    
+    #dut.vld_i.value = 0
 
     for i in range(12):
         await RisingEdge(aclk)
-    
+        
     await Timer(50, units = "ns")
     
 def gf_poly_eval_tb():
 
     test_module = "gf_poly_eval_tb"
-    hdl_toplevel = "gf_poly_eval"
+    hdl_toplevel = "Test"
     hdl_toplevel_lang = os.getenv("HDL_TOPLEVEL_LANG", "verilog")
     sim = os.getenv("SIM", "verilator")
 
@@ -121,14 +134,9 @@ def gf_poly_eval_tb():
     verilog_sources = []
     includes        = []
     f_file          = []
-
-    verilog_sources.append(proj_path / "lib" / "lib_mux_onehot.sv")
-    verilog_sources.append(proj_path / "lib" / "lib_ffs.sv")
-    verilog_sources.append(proj_path / "lib" / "lib_mux_ffs.sv")
-    verilog_sources.append(proj_path / "lib" / "lib_pipe.sv")
-    verilog_sources.append(proj_path / "rs" / "rtl" / "gf_pkg.sv")
-    verilog_sources.append(proj_path / "rs" / "rtl" / "gf_poly_eval.sv")
-
+    
+    verilog_sources.append(proj_path / "rs" / "sim" / "gf_poly_eval" / "Test.sv")
+    
     # Parameters    
     parameters = {        
                   }

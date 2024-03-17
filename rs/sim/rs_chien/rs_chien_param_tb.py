@@ -163,10 +163,10 @@ async def rs_syndrome_test(dut):
     predictor.predict()
     pkt_comp.compare()
 
-def rs_chien_param_tb():
+def rs_chien_tb():
     
-    test_module = "rs_chien_param_tb"
-    hdl_toplevel = "rs_chien_param"
+    test_module = "rs_chien_tb"
+    hdl_toplevel = "rs_chien"
     hdl_toplevel_lang = os.getenv("HDL_TOPLEVEL_LANG", "verilog")
     sim = os.getenv("SIM", "verilator")
     
@@ -186,7 +186,7 @@ def rs_chien_param_tb():
     verilog_sources.append(proj_path / "lib" / "lib_decmps_to_pow2.sv")
     verilog_sources.append(proj_path / "rs" / "rtl" / "gf_pkg.sv")
     verilog_sources.append(proj_path / "rs" / "rtl" / "gf_poly_eval.sv")
-    verilog_sources.append(proj_path / "rs" / "rtl" / "rs_chien_param.sv")
+    verilog_sources.append(proj_path / "rs" / "rtl" / "rs_chien.sv")
 
     # Parameters    
     parameters = {}
@@ -214,4 +214,4 @@ def rs_chien_param_tb():
 
 
 if __name__ == "__main__":
-    rs_chien_param_tb()
+    rs_chien_tb()
